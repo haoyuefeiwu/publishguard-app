@@ -35,17 +35,17 @@ CRITICAL AMAZON KDP COMPLIANCE RULES (STRICTLY ENFORCED):
 """
 
 
-def call_openrouter_chat(
+def _post_chat_completions(
     *,
     messages: list[dict[str, str]],
     model: str,
     api_key: str,
-    base_url: str = "https://openrouter.ai/api/v1",
-    temperature: float = 0.7,
-    max_tokens: int = 4096,
-    json_mode: bool = False,
+    base_url: str,
+    temperature: float,
+    max_tokens: int,
+    json_mode: bool,
 ) -> str:
-    """调用 OpenRouter（或兼容 OpenAI API 网关）完成推理请求。"""
+    """向指定 OpenAI 兼容端点发送单次推理请求。"""
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -66,6 +66,48 @@ def call_openrouter_chat(
         resp.raise_for_status()
         data = resp.json()
         return str(data["choices"][0]["message"]["content"]).strip()
+
+
+def call_openrouter_chat(
+    *,
+    messages: list[dict[str, str]],
+    model: str,
+    api_key: str,
+    base_url: str = "https://openrouter.ai/api/v1",
+    temperature: float = 0.7,
+    max_tokens: int = 4096,
+    json_mode: bool = False,
+) -> str:
+    """调用主网关（默认 Gemini / OpenRouter），失败（没额度/限流/超时）时自动切换到 DeepSeek 兜底。"""
+    try:
+        return _post_chat_completions(
+            messages=messages,
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            json_mode=json_mode,
+        )
+    except Exception as primary_err:
+        fallback_key = os.environ.get("FALLBACK_API_KEY") or os.environ.get("DEEPSEEK_API_KEY", "")
+        if not fallback_key or fallback_key == api_key:
+            raise
+        fallback_base = os.environ.get("FALLBACK_BASE_URL", "https://api.deepseek.com/v1")
+        fallback_model = os.environ.get("FALLBACK_MODEL", "deepseek-chat")
+        print(
+            f"[book_writer] 主模型 {model} 调用失败 ({type(primary_err).__name__})，自动切换兜底模型 {fallback_model}",
+            file=sys.stderr,
+        )
+        return _post_chat_completions(
+            messages=messages,
+            model=fallback_model,
+            api_key=fallback_key,
+            base_url=fallback_base,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            json_mode=json_mode,
+        )
 
 
 def _fallback_outline_payload(topic: str, audience: str, genre: str, companion_product: str) -> dict[str, Any]:
