@@ -1,9 +1,9 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 
 import { Link } from '@/core/i18n/navigation';
-import { envConfigs } from '@/config';
 import { cn } from '@/lib/utils';
+import { KdpGuardWorkbench } from '@/components/kdp-guard-workbench';
 import { buttonVariants } from '@/components/ui/button';
 import { DotPattern } from '@/components/ui/dot-pattern';
 
@@ -11,27 +11,30 @@ export async function Hero() {
   const t = await getTranslations('landing');
 
   return (
-    <section className="relative isolate flex flex-col items-center justify-center overflow-hidden px-4 pt-24 pb-20 sm:pt-40 sm:pb-32">
+    <section className="relative isolate flex flex-col items-center justify-center overflow-hidden px-4 pt-20 pb-20 sm:pt-28 sm:pb-28">
       <DotPattern
         className={cn(
           '[mask-image:radial-gradient(ellipse_at_center,white,transparent_75%)]',
           'text-foreground/15'
         )}
       />
-      <div className="relative max-w-3xl space-y-8 text-center">
-        <p className="text-muted-foreground text-xs tracking-[0.25em] uppercase">
-          {envConfigs.app_name}
-        </p>
-        <h1 className="text-foreground font-serif text-5xl leading-[1.1] font-normal tracking-tight sm:text-6xl lg:text-7xl">
+      <div className="relative mx-auto w-full max-w-4xl space-y-8 text-center">
+        <div className="border-border bg-card/80 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-medium backdrop-blur-xs">
+          <ShieldCheck className="size-3.5 text-emerald-600" />
+          <span>{t('hero.badge')}</span>
+        </div>
+
+        <h1 className="text-foreground font-serif text-4xl leading-[1.08] font-normal tracking-tight sm:text-6xl">
           {t('hero.headline')}
         </h1>
-        <p className="text-muted-foreground mx-auto max-w-2xl text-lg leading-relaxed sm:text-xl">
+
+        <p className="text-muted-foreground mx-auto max-w-2xl text-base leading-relaxed sm:text-lg">
           {t('hero.subheadline')}
         </p>
 
-        <div className="flex items-center justify-center gap-3 pt-4">
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
           <Link
-            href="/settings"
+            href="/studio/new"
             className={cn(
               buttonVariants({ size: 'lg' }),
               'h-12 gap-2 rounded-full px-8'
@@ -40,6 +43,20 @@ export async function Hero() {
             {t('hero.cta')}
             <ArrowRight className="size-4" />
           </Link>
+          <Link
+            href="/tools/kdp-guard"
+            className={cn(
+              buttonVariants({ variant: 'outline', size: 'lg' }),
+              'h-12 gap-2 rounded-full px-7'
+            )}
+          >
+            {t('hero.secondary')}
+          </Link>
+        </div>
+
+        {/* 首屏强交互钩子：免注册直接跑一次书名撞车 + 26 项风险快测 */}
+        <div className="pt-6">
+          <KdpGuardWorkbench compact />
         </div>
       </div>
     </section>

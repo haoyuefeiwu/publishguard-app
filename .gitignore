@@ -43,10 +43,15 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# database
+# database (保留 drizzle/ 迁移 SQL 入库供 Docker 生产构建直接迁移)
 /data/
-/drizzle/
 src/config/db/schema.ts
+
+# python worker caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+worker/artifacts/
 
 # npm (project uses pnpm)
 package-lock.json

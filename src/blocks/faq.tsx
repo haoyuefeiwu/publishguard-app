@@ -8,11 +8,11 @@ import {
 } from '@/components/ui/accordion';
 
 const FAQ_KEYS = [
-  'stack',
-  'payment',
-  'database',
-  'customize',
-  'license',
+  'ban_risk',
+  'word_count',
+  'ownership',
+  'kdp_setup',
+  'refund',
 ] as const;
 
 export async function FAQ() {

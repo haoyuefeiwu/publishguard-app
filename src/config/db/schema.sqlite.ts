@@ -697,3 +697,6 @@ export type Ticket = typeof ticket.$inferSelect;
 export type NewTicket = typeof ticket.$inferInsert;
 export type TicketMessage = typeof ticketMessage.$inferSelect;
 export type NewTicketMessage = typeof ticketMessage.$inferInsert;
+
+// ─── PublishGuard KDP 业务表 ──────────────────────────────────────────────────
+export * from './kdp-schema.sqlite';

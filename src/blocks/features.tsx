@@ -1,10 +1,10 @@
 import {
-  Coins,
-  CreditCard,
-  FileText,
-  Globe,
-  ShieldCheck,
-  Users,
+  BookOpenCheck,
+  FileCheck2,
+  Layers,
+  Radar,
+  ShieldAlert,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
@@ -13,12 +13,12 @@ export async function Features() {
   const t = await getTranslations('landing');
 
   const features: { key: string; icon: LucideIcon }[] = [
-    { key: 'auth', icon: ShieldCheck },
-    { key: 'payment', icon: CreditCard },
-    { key: 'rbac', icon: Users },
-    { key: 'i18n', icon: Globe },
-    { key: 'cms', icon: FileText },
-    { key: 'credits', icon: Coins },
+    { key: 'firewall', icon: ShieldAlert },
+    { key: 'collision', icon: Radar },
+    { key: 'isolation', icon: Layers },
+    { key: 'writer', icon: Sparkles },
+    { key: 'print', icon: BookOpenCheck },
+    { key: 'epub', icon: FileCheck2 },
   ];
 
   return (
@@ -28,7 +28,7 @@ export async function Features() {
           <h2 className="font-serif text-4xl font-normal tracking-tight sm:text-5xl">
             {t('features.title')}
           </h2>
-          <p className="text-muted-foreground mx-auto mt-5 max-w-lg">
+          <p className="text-muted-foreground mx-auto mt-5 max-w-2xl">
             {t('features.description')}
           </p>
         </div>

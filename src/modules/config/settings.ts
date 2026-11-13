@@ -154,6 +154,20 @@ export function getSettingGroups(): SettingGroup[] {
 
     // AI
     {
+      name: 'openrouter',
+      title: 'OpenRouter Gateway',
+      description:
+        'Unified OpenRouter gateway for outline, book writer, and sanitizer',
+      tab: 'ai',
+    },
+    {
+      name: 'kdp_routing',
+      title: 'PublishGuard Model Routing',
+      description:
+        'Route outline/sanitize and long-form writing to optimal models',
+      tab: 'ai',
+    },
+    {
       name: 'openai',
       title: 'OpenAI',
       description: 'OpenAI (or compatible) API',
@@ -266,14 +280,16 @@ export function getSettings(): Setting[] {
       type: 'switch',
       group: 'credit',
       tab: 'general',
+      defaultValue: 'true',
     },
     {
       name: 'initial_credits_amount',
       title: 'Credits amount',
       type: 'number',
-      placeholder: '100',
+      placeholder: '30',
       group: 'credit',
       tab: 'general',
+      defaultValue: '30',
     },
     {
       name: 'initial_credits_valid_days',
@@ -282,14 +298,16 @@ export function getSettings(): Setting[] {
       placeholder: '365',
       group: 'credit',
       tab: 'general',
+      defaultValue: '365',
     },
     {
       name: 'initial_credits_description',
       title: 'Description',
       type: 'text',
-      placeholder: 'Welcome bonus',
+      placeholder: 'Welcome bonus (30 trial credits)',
       group: 'credit',
       tab: 'general',
+      defaultValue: 'PublishGuard Welcome Bonus (30 Credits)',
     },
 
     // ─── Auth / Email ────────────────────────────────────────────────
@@ -769,6 +787,55 @@ export function getSettings(): Setting[] {
       placeholder: 'https://cdn.example.com',
       group: 'r2',
       tab: 'storage',
+    },
+
+    // ─── AI / OpenRouter & PublishGuard Routing ────────────────────────
+    {
+      name: 'openrouter_base_url',
+      title: 'OpenRouter Base URL',
+      type: 'text',
+      placeholder: 'https://openrouter.ai/api/v1',
+      defaultValue: 'https://openrouter.ai/api/v1',
+      group: 'openrouter',
+      tab: 'ai',
+    },
+    {
+      name: 'openrouter_api_key',
+      title: 'OpenRouter API Key',
+      type: 'password',
+      placeholder: 'sk-or-v1-xxx',
+      group: 'openrouter',
+      tab: 'ai',
+    },
+    {
+      name: 'kdp_outline_model',
+      title: 'Outline & Title Model',
+      type: 'text',
+      placeholder: 'google/gemini-2.5-flash',
+      defaultValue: 'google/gemini-2.5-flash',
+      tip: 'Fast cost-effective model for keyword/title brainstorming and 11-chapter outlines',
+      group: 'kdp_routing',
+      tab: 'ai',
+    },
+    {
+      name: 'kdp_writer_model',
+      title: 'Long-Form Writer Model',
+      type: 'text',
+      placeholder: 'anthropic/claude-sonnet-4',
+      defaultValue: 'anthropic/claude-sonnet-4',
+      tip: 'High-prose model for 18,000-22,000 word non-fiction chapters',
+      group: 'kdp_routing',
+      tab: 'ai',
+    },
+    {
+      name: 'kdp_sanitizer_model',
+      title: 'Compliance Sanitizer Model',
+      type: 'text',
+      placeholder: 'google/gemini-2.5-flash',
+      defaultValue: 'google/gemini-2.5-flash',
+      tip: 'Rewrites flagged clinical/promotional terms cleanly in-place',
+      group: 'kdp_routing',
+      tab: 'ai',
     },
 
     // ─── AI / OpenAI ─────────────────────────────────────────────────

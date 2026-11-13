@@ -6,6 +6,8 @@ export async function Header() {
   const t = await getTranslations('landing');
 
   const navLinks = [
+    { href: '/studio', label: t('nav.studio') },
+    { href: '/tools/kdp-guard', label: t('nav.guard') },
     { href: '/#features', label: t('nav.features') },
     { href: '/pricing', label: t('nav.pricing') },
     { href: '/blog', label: t('nav.blog') },

@@ -1,126 +1,118 @@
 {
   "nav": {
-    "features": "功能",
-    "pricing": "价格",
-    "blog": "博客"
+    "studio": "造书工作台",
+    "guard": "免费防封体检",
+    "features": "核心壁垒",
+    "pricing": "定价方案",
+    "blog": "出版专栏"
   },
   "hero": {
-    "headline": "一小时上线你的 AI 产品",
-    "subheadline": "认证、支付、订阅、积分、权限、内容管理和国际化 — 全部预置就绪，直接在上面构建你的产品。",
-    "cta": "立即开始",
-    "secondary": "控制台"
-  },
-  "chips": {
-    "auth": "身份认证",
-    "payment": "支付系统",
-    "subscription": "订阅管理",
-    "credits": "积分系统",
-    "rbac": "权限管理",
-    "i18n": "国际化",
-    "cms": "内容管理",
-    "apikeys": "API 密钥"
+    "badge": "26 项 Amazon KDP 零风控防火墙 + 双轨印刷级出版工坊",
+    "headline": "写出能过亚马逊严审、真正合规上架变现的 KDP 专著。",
+    "subheadline": "市面上普通 AI 写书工具只管吐字、不管封号。PublishGuard 内置实战淬炼的 26 项 KDP 防封扫雷、Apple Books / OpenLibrary 全网撞车雷达、18,000+ 词深度长文引擎与精确算脊的 6×9 印刷级 PDF / Kindle EPUB 3 编译器。",
+    "cta": "免费立项试写一本书",
+    "secondary": "免费运行 26 项防封体检"
   },
   "features": {
-    "title": "开箱即用的完整功能",
-    "description": "预置的业务逻辑，让你专注于产品本身。",
-    "auth": {
-      "title": "身份认证",
-      "description": "邮箱密码、Google、GitHub OAuth 登录，开箱即用，自带会话管理和账号关联。"
+    "title": "卖的不是普通 AI 文案，而是“活得过亚马逊审核”的出版基础设施",
+    "description": "每一条拦截红线均源自真实 KDP 人工复审与封控日志，在点击 Publish 前物理阻断 \"Disappointing Customer Experience\" 退稿与封号。",
+    "firewall": {
+      "title": "26 项 KDP 上架防封防火墙",
+      "description": "精准拦截 DSM-5 临床诊断/根治词、优惠券代码、虚假出版社印记、低内容 Scorecard 触发词，以及诱导平装书误判为打卡表的矩形边框 CSS。"
     },
-    "payment": {
-      "title": "支付系统",
-      "description": "Stripe、PayPal、支付宝、微信支付 — 结账、订阅、Webhook 和订单管理。"
+    "collision": {
+      "title": "全网主书名防撞车雷达",
+      "description": "立项即实时查询 Apple Books 与 OpenLibrary 书库，阻断与成熟畅销书或用户历史笔名撞车，远离 Option 1 仿冒封号风险。"
     },
-    "rbac": {
-      "title": "角色与权限",
-      "description": "细粒度的 RBAC 权限控制，支持通配符匹配。完整的管理后台管理用户、角色和权限。"
+    "isolation": {
+      "title": "多笔名防连坐隔离矩阵",
+      "description": "物理检测跨笔名复用同一伴读域名的高危关联指纹，并内置 7 天单账号安全发书冷却提醒，彻底告别连带封号。"
     },
-    "i18n": {
-      "title": "国际化",
-      "description": "内置中英文支持，路由感知语言切换，轻松扩展更多语言。"
+    "writer": {
+      "title": "18,000–22,000 词长文引擎",
+      "description": "带前文滚动记忆的 12 节专著撰写流水线，稳定产出沉甸甸的深度非虚构内容，彻底告别 Thin Content 单薄小册子秒拒。"
     },
-    "cms": {
-      "title": "内容管理",
-      "description": "分类和文章的完整 CRUD，支持状态管理和管理后台 — 快速搭建博客或文档。"
+    "print": {
+      "title": "二分锁页 6×9 印刷 PDF 与展开封套",
+      "description": "Chrome Headless 自动二分字号精确锁定 100/120/150 偶数页，按 Cream/White 纸厚精准算出书脊与条形码留白，提供 4 套去同质化大师封面。"
     },
-    "credits": {
-      "title": "积分系统",
-      "description": "FIFO 消费、过期控制、注册自动发放和撤销 — 为按量计费做好准备。"
+    "epub": {
+      "title": "零卡顿 Kindle EPUB 3 编译器",
+      "description": "自动剥离易触发爬虫 429 的外部可点击超链接，将伴读二维码强制转为 8-bit RGB 位图，杜绝 Kindle Previewer 卡死 95%。"
     }
   },
   "pricing": {
-    "title": "价格",
-    "description": "选择适合你的方案。",
-    "monthly": "月付",
-    "yearly": "年付",
-    "lifetime": "买断",
-    "popular": "热门",
-    "best_value": "超值",
-    "buy_lifetime": "一次买断",
-    "starter": "入门版",
-    "starter_desc": "适合个人用户",
-    "pro": "专业版",
-    "pro_desc": "适合成长型团队",
-    "enterprise": "企业版",
-    "enterprise_desc": "适合大型组织",
-    "feature_1_project": "1 个项目",
-    "feature_5k_credits": "5,000 积分",
-    "feature_email_support": "邮件支持",
-    "feature_unlimited_projects": "无限项目",
-    "feature_50k_credits": "50,000 积分",
-    "feature_priority_support": "优先支持",
-    "feature_api_access": "API 访问",
-    "feature_everything_pro": "包含专业版全部功能",
-    "feature_unlimited_credits": "无限积分",
-    "feature_dedicated_support": "专属支持",
-    "feature_custom_integrations": "定制集成"
+    "title": "按需选购，透明无套路的出版积分体系",
+    "description": "免费生成 12 节深度大纲与第 1 章完整试读；满意质感后，再按单本或月度订阅解锁全套印刷与电子书文件包。",
+    "pass": "单本买断",
+    "monthly": "按月订阅",
+    "yearly": "按年订阅（省 33%）",
+    "popular": "主推方案",
+    "best_value": "工作室优选",
+    "buy_once": "购买单本通行证",
+    "start_sub": "立即订阅",
+    "single_name": "Single Book Pass（单本通行证）",
+    "single_desc": "零订阅负担，适合新手完整发布第 1 本合规 KDP 图书。",
+    "single_credits": "120 积分（1 年有效）",
+    "pro_name": "Author Pro（专业出版人）",
+    "pro_desc": "契合每周 1 本安全发布节奏（每月约 3 本双轨专著）。",
+    "pro_credits": "每月 360 积分",
+    "studio_name": "Publishing Studio（工作室版）",
+    "studio_desc": "多笔名防关联矩阵管理 + 最高优先级 PDF 渲染队列。",
+    "studio_credits": "每月 1,000 积分",
+    "feature_guard_unlimited": "无限次 26 项 KDP 防封扫雷体检",
+    "feature_dual_bundle": "一键导出 EPUB 3 + 6×9 印刷 PDF + 全展开封面",
+    "feature_four_covers": "解锁全部 4 套去同质化专业出版社封面",
+    "feature_ai_sanitize": "AI 一键合规洗稿脱敏（高危词原地替换）",
+    "feature_pen_isolation": "跨笔名域名隔离告警与 7 天发布节奏保护",
+    "feature_priority_worker": "高优先级 Chrome Headless 排版渲染通道"
   },
   "faq": {
     "title": "常见问题",
-    "description": "开始之前你可能想了解的一切。",
-    "stack": {
-      "question": "用的是什么技术栈？",
-      "answer": "Next.js 16（App Router）、React 19、TypeScript 严格模式、Tailwind CSS 4、shadcn/ui、Drizzle ORM 和 better-auth。所有业务逻辑都内置在代码里——支付、邮件、存储、AI 都不依赖外部包。"
+    "description": "为什么资深 KDP 卖家不再只用普通 AI 写书工具。",
+    "ban_risk": {
+      "question": "它和 getebook.ai 等普通 AI 写书工具有什么本质区别？",
+      "answer": "竞品只管把一段文本导出成 PDF/EPUB，极易踩中亚马逊医疗词、外链 429、低内容边框和书名撞车红线。PublishGuard 核心竞争力是把 26 项封号前置审查、精确算脊封面工程与 KDP 填表清单全链路内置。"
     },
-    "payment": {
-      "question": "支持哪些支付方式？",
-      "answer": "开箱即用支持 Stripe、PayPal、Creem、支付宝和微信支付。通过 PaymentManager 抽象层，只需实现一个接口就能接入新的支付渠道。"
+    "word_count": {
+      "question": "为什么要写到 18,000 词以上，而不是几千词的小册子？",
+      "answer": "亚马逊阅读时长模型（KES）会直接将低于 1 万词的书籍判定为单薄内容（Thin Content）并予以封禁。18,000~22,000 词正好支撑起扎实的 100 页 6×9 平装专著，客单价和读者好评率高出数倍。"
     },
-    "database": {
-      "question": "支持哪些数据库？",
-      "answer": "Drizzle ORM 支持 PostgreSQL、MySQL、SQLite、Turso 和 Cloudflare D1。只需修改 .env 中的 DATABASE_PROVIDER——schema 模板和 drizzle 配置会自动适配。"
+    "ownership": {
+      "question": "导出的图书版权和版税归谁所有？",
+      "answer": "100% 归您个人所有。我们不在您的出版物中植入任何第三方印记、强制水印或推广链接，您可自由在全球 Amazon KDP 及其他出版平台商业变现。"
     },
-    "customize": {
-      "question": "落地页可以自定义到什么程度？",
-      "answer": "src/blocks/ 下的 section 都是示例内容，本来就是要每个项目自己重写的。src/components/ 里才是长期沉淀的基础组件——换品牌只动 blocks 和翻译，底层架构不变。"
+    "kdp_setup": {
+      "question": "后台填表时容易选错分类和关键词怎么办？",
+      "answer": "每本成品都会附带一键复制的 Metadata Checklist JSON 与后台填表辅助页，类目严格匹配 KDP 官方 31 顶级分类白名单（淘汰过时旧分类），副标题自动锁在 100 字符安全区内。"
     },
-    "license": {
-      "question": "可以用于商业项目吗？",
-      "answer": "可以。ShipAny Next 就是为生产级 SaaS 打造的。克隆之后代码归你——没有按用户数收费，也不依赖我们的任何基础设施。"
+    "refund": {
+      "question": "如果全本生成过程中遇到任务异常怎么办？",
+      "answer": "系统采用严格的原子级积分托管：若任务在交付完整资产前失败，扣除的积分将自动全额退还至您的账户余额。"
     }
   },
   "blog": {
-    "title": "最新博客",
-    "description": "来自团队的产品动态、使用指南与工程笔记。",
+    "title": "KDP 合规风控与出版实战专栏",
+    "description": "从防封避坑、利基选题到印刷级排版的深度经验分享。",
     "view_all": "查看全部文章"
   },
   "cta": {
-    "headline": "准备好构建你的 SaaS 了吗？",
-    "subheadline": "别再从零搭建认证、支付和权限系统了。用 ShipAny Next 起步，专注打造真正让产品与众不同的东西。",
-    "button": "免费开始使用"
+    "headline": "别再拿珍贵的 KDP 账号去试错了。",
+    "subheadline": "注册即领 30 试玩积分，先免费体验 26 项扫雷体检与第 1 章试读质感。",
+    "button": "立即进入造书工作台"
   },
   "footer": {
-    "tagline": "极速发布你的 AI 产品",
-    "feature": "功能",
-    "product": "产品",
-    "resources": "资源",
-    "legal": "法律信息",
+    "tagline": "亚马逊 KDP 零风控出版基础设施。",
+    "feature": "核心能力",
+    "product": "在线工具",
+    "resources": "资源中心",
+    "legal": "法律条款",
     "privacy": "隐私政策",
     "terms": "服务条款",
-    "settings": "设置",
+    "settings": "账户与额度",
     "admin": "管理后台",
-    "blog": "博客",
-    "docs": "文档",
-    "github": "GitHub"
+    "blog": "博客专栏",
+    "docs": "免费体检仪",
+    "github": "造书工作台"
   }
 }

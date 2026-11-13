@@ -1,0 +1,22 @@
+FROM python:3.12-slim-bookworm
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=${SOURCE_REVISION}
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    CHROME_BIN=/usr/bin/chromium
+
+# 安装无头 Chromium 及专业中英文印刷级衬线/无衬线字体
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    fonts-liberation \
+    fonts-noto-core \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY worker/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt && useradd --system --uid 1001 worker
+COPY --chown=worker:worker worker/ ./worker/
+RUN mkdir -p /app/data/kdp-artifacts && chown -R worker:worker /app/data
+USER worker
+CMD ["python", "worker/main.py"]

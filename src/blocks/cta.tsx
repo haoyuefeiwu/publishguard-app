@@ -20,7 +20,7 @@ export async function CTA() {
           </p>
           <div className="mt-8 flex justify-center">
             <Link
-              href="/settings"
+              href="/studio"
               className={cn(
                 buttonVariants({ size: 'lg' }),
                 'h-12 gap-2 rounded-full px-8'

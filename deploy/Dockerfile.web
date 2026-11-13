@@ -1,0 +1,49 @@
+FROM node:22-bookworm-slim AS deps
+WORKDIR /app
+ENV DATABASE_PROVIDER=postgres HUSKY=0 NEXT_TELEMETRY_DISABLED=1
+RUN npm install --global pnpm@10.17.1
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY scripts/db-setup.mjs scripts/db-setup.mjs
+COPY src/config/db/ src/config/db/
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS build
+COPY . .
+ARG APP_URL=https://publishguard.ai
+ENV NEXT_PUBLIC_APP_URL=${APP_URL} \
+    NEXT_PUBLIC_APP_NAME="PublishGuard" \
+    NEXT_PUBLIC_APP_DOMAIN="publishguard.ai" \
+    NEXT_PUBLIC_APP_DESCRIPTION="The Ban-Proof Amazon KDP Publishing & AI Book Studio" \
+    NEXT_PUBLIC_DEFAULT_LOCALE=en \
+    DOCKER=1
+RUN test -n "$APP_URL" && pnpm build
+
+FROM deps AS migration-files
+RUN mkdir -p /migration/node_modules && \
+    cp -LR node_modules/drizzle-orm /migration/node_modules/drizzle-orm && \
+    cp -LR node_modules/postgres /migration/node_modules/postgres
+
+FROM node:22-bookworm-slim AS migrate
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=${SOURCE_REVISION}
+WORKDIR /app
+COPY --from=migration-files /migration/node_modules ./node_modules
+COPY deploy/migrate.mjs ./
+COPY drizzle/ drizzle/
+USER node
+CMD ["node", "migrate.mjs"]
+
+FROM node:22-bookworm-slim AS web
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=${SOURCE_REVISION}
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1
+# Web 容器内同时提供 Python 3 运行轻量 26-Rule Pre-Flight Guard 同步接口
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pil && rm -rf /var/lib/apt/lists/*
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/worker ./worker
+USER node
+EXPOSE 3000
+CMD ["node", "server.js"]

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, isNull, or, sql, sum } from 'drizzle-orm';
 
 import { db } from '@/core/db';
+import { envConfigs } from '@/config';
 import { credit } from '@/config/db/schema';
 import { getSnowId, getUuid } from '@/lib/hash';
 
@@ -151,7 +152,7 @@ export async function consume(params: {
     const consumedItems: any[] = [];
 
     while (remainingToConsume > 0 && batchNo < maxBatches) {
-      const batchCredits = await tx
+      const baseQuery = tx
         .select()
         .from(credit)
         .where(
@@ -164,8 +165,14 @@ export async function consume(params: {
           )
         )
         .orderBy(asc(credit.expiresAt))
-        .limit(batchSize)
-        .for('update');
+        .limit(batchSize);
+
+      const supportsRowLock = ['postgres', 'postgresql', 'mysql'].includes(
+        (envConfigs.database_provider || '').toLowerCase()
+      );
+      const batchCredits = supportsRowLock
+        ? await baseQuery.for('update')
+        : await baseQuery;
 
       if (!batchCredits || batchCredits.length === 0) break;
 

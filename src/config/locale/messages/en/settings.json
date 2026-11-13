@@ -3,6 +3,9 @@
   "welcome": "Welcome back, {name}",
   "placeholder": "Your app content goes here.",
   "nav": {
+    "studio": "Book Studio",
+    "guard": "KDP Guard",
+    "profiles": "Pen Profiles",
     "overview": "Overview",
     "profile": "Profile",
     "billing": "Billing",

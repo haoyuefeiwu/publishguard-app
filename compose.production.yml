@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: publishguard
+      POSTGRES_USER: publishguard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U publishguard -d publishguard']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+      target: migrate
+    profiles: ['migrate']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_PROVIDER: postgres
+      DATABASE_URL: postgresql://publishguard:${POSTGRES_PASSWORD}@postgres:5432/publishguard
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+      target: web
+      args:
+        APP_URL: ${NEXT_PUBLIC_APP_URL:-https://publishguard.ai}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_PROVIDER: postgres
+      DATABASE_URL: postgresql://publishguard:${POSTGRES_PASSWORD}@postgres:5432/publishguard
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://publishguard.ai}
+      AUTH_URL: ${NEXT_PUBLIC_APP_URL:-https://publishguard.ai}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
+      CONFIG_ENCRYPTION_KEY: ${CONFIG_ENCRYPTION_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      KDP_ARTIFACTS_DIR: /app/data/kdp-artifacts
+    volumes:
+      - kdp_artifacts:/app/data/kdp-artifacts
+    ports:
+      - '127.0.0.1:3000:3000'
+
+  worker:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_PROVIDER: postgres
+      DATABASE_URL: postgresql://publishguard:${POSTGRES_PASSWORD}@postgres:5432/publishguard
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      KDP_OUTLINE_MODEL: ${KDP_OUTLINE_MODEL:-google/gemini-2.5-flash}
+      KDP_WRITER_MODEL: ${KDP_WRITER_MODEL:-anthropic/claude-sonnet-4}
+      KDP_SANITIZER_MODEL: ${KDP_SANITIZER_MODEL:-google/gemini-2.5-flash}
+      KDP_ARTIFACTS_DIR: /app/data/kdp-artifacts
+    volumes:
+      - kdp_artifacts:/app/data/kdp-artifacts
+
+volumes:
+  pg_data:
+  kdp_artifacts:

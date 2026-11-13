@@ -3,6 +3,9 @@
   "welcome": "欢迎回来，{name}",
   "placeholder": "你的应用内容在这里。",
   "nav": {
+    "studio": "造书工作台",
+    "guard": "26项防封体检",
+    "profiles": "笔名防关联",
     "overview": "概览",
     "profile": "个人资料",
     "billing": "账单",

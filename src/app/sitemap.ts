@@ -6,6 +6,7 @@ import { getBlogPosts } from '@/content/posts';
 
 const STATIC_PATHS = [
   '',
+  '/tools/kdp-guard',
   '/pricing',
   '/blog',
   '/privacy-policy',

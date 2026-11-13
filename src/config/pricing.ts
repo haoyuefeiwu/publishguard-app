@@ -1,11 +1,6 @@
 /**
- * Authoritative pricing catalog.
- *
- * The checkout API uses this as the SOURCE OF TRUTH for price/credits/duration.
- * Any price, credits, or plan info sent by the client is IGNORED — only the
- * product_id is honored, and everything else is looked up here.
- *
- * To change pricing, edit this file and redeploy. Admin UI cannot alter prices.
+ * PublishGuard 权威商品与积分定价目录。
+ * 结账路由以此文件为唯一价格、积分与周期权威来源，彻底忽略前端提交的价格或积分字段。
  */
 
 import { PaymentInterval, PaymentType } from '@/core/payment/types';
@@ -30,117 +25,88 @@ export type PricingProduct = {
 };
 
 /**
- * Default demo catalog. Replace with your real products when launching.
- * Keys MUST match what the pricing UI sends as product_id.
+ * 获批商业漏斗定价矩阵：
+ * - Single Book Pass（$29 一次性买断，120 积分）：恰好完成 1 本双轨专著 + 2 次局部洗稿重写
+ * - Author Pro（$49/月 或 $390/年，每月 360 积分）：匹配 KDP 安全节奏（每月约 3 本）
+ * - Publishing Studio（$99/月 或 $790/年，每月 1,000 积分）：多笔名矩阵隔离 + 最高优先级渲染
  */
 export const pricingCatalog: Record<string, PricingProduct> = {
-  starter_monthly: {
-    productId: 'starter_monthly',
-    productName: 'Starter',
-    planName: 'Starter',
-    description: 'Starter Monthly',
-    type: PaymentType.SUBSCRIPTION,
-    priceInCents: 900,
-    currency: 'usd',
-    credits: 5000,
-    plan: {
-      name: 'Starter',
-      interval: PaymentInterval.MONTH,
-      intervalCount: 1,
-    },
-  },
-  pro_monthly: {
-    productId: 'pro_monthly',
-    productName: 'Pro',
-    planName: 'Pro',
-    description: 'Pro Monthly',
-    type: PaymentType.SUBSCRIPTION,
+  single_book_pass: {
+    productId: 'single_book_pass',
+    productName: 'Single Book Pass',
+    planName: 'Single Book Pass',
+    description:
+      'One-time pass with 120 credits (1 full dual-format book + rewrites)',
+    type: PaymentType.ONE_TIME,
     priceInCents: 2900,
     currency: 'usd',
-    credits: 50000,
-    plan: { name: 'Pro', interval: PaymentInterval.MONTH, intervalCount: 1 },
+    credits: 120,
+    creditsValidDays: 365,
   },
-  enterprise_monthly: {
-    productId: 'enterprise_monthly',
-    productName: 'Enterprise',
-    planName: 'Enterprise',
-    description: 'Enterprise Monthly',
+  author_pro_monthly: {
+    productId: 'author_pro_monthly',
+    productName: 'Author Pro',
+    planName: 'Author Pro Monthly',
+    description: '360 credits / month — built for safe weekly KDP cadence',
     type: PaymentType.SUBSCRIPTION,
-    priceInCents: 9900,
+    priceInCents: 4900,
     currency: 'usd',
-    credits: 500000,
+    credits: 360,
+    creditsValidDays: 31,
     plan: {
-      name: 'Enterprise',
+      name: 'Author Pro',
       interval: PaymentInterval.MONTH,
       intervalCount: 1,
     },
   },
-  starter_yearly: {
-    productId: 'starter_yearly',
-    productName: 'Starter',
-    planName: 'Starter',
-    description: 'Starter Yearly',
+  author_pro_yearly: {
+    productId: 'author_pro_yearly',
+    productName: 'Author Pro',
+    planName: 'Author Pro Yearly',
+    description: '4,320 credits / year — save 33% on Author Pro',
     type: PaymentType.SUBSCRIPTION,
-    priceInCents: 8600,
+    priceInCents: 39000,
     currency: 'usd',
-    credits: 60000,
-    plan: { name: 'Starter', interval: PaymentInterval.YEAR, intervalCount: 1 },
-  },
-  pro_yearly: {
-    productId: 'pro_yearly',
-    productName: 'Pro',
-    planName: 'Pro',
-    description: 'Pro Yearly',
-    type: PaymentType.SUBSCRIPTION,
-    priceInCents: 27800,
-    currency: 'usd',
-    credits: 600000,
-    plan: { name: 'Pro', interval: PaymentInterval.YEAR, intervalCount: 1 },
-  },
-  enterprise_yearly: {
-    productId: 'enterprise_yearly',
-    productName: 'Enterprise',
-    planName: 'Enterprise',
-    description: 'Enterprise Yearly',
-    type: PaymentType.SUBSCRIPTION,
-    priceInCents: 95000,
-    currency: 'usd',
-    credits: 6000000,
+    credits: 4320,
+    creditsValidDays: 366,
     plan: {
-      name: 'Enterprise',
+      name: 'Author Pro',
       interval: PaymentInterval.YEAR,
       intervalCount: 1,
     },
   },
-  starter_lifetime: {
-    productId: 'starter_lifetime',
-    productName: 'Starter',
-    planName: 'Starter Lifetime',
-    description: 'Starter Lifetime',
-    type: PaymentType.ONE_TIME,
-    priceInCents: 14900,
+  studio_monthly: {
+    productId: 'studio_monthly',
+    productName: 'Publishing Studio',
+    planName: 'Publishing Studio Monthly',
+    description:
+      '1,000 credits / month — multi-pen-name isolation & priority worker queue',
+    type: PaymentType.SUBSCRIPTION,
+    priceInCents: 9900,
     currency: 'usd',
-    credits: 100000,
+    credits: 1000,
+    creditsValidDays: 31,
+    plan: {
+      name: 'Publishing Studio',
+      interval: PaymentInterval.MONTH,
+      intervalCount: 1,
+    },
   },
-  pro_lifetime: {
-    productId: 'pro_lifetime',
-    productName: 'Pro',
-    planName: 'Pro Lifetime',
-    description: 'Pro Lifetime',
-    type: PaymentType.ONE_TIME,
-    priceInCents: 49900,
+  studio_yearly: {
+    productId: 'studio_yearly',
+    productName: 'Publishing Studio',
+    planName: 'Publishing Studio Yearly',
+    description: '12,000 credits / year — save 33% on Publishing Studio',
+    type: PaymentType.SUBSCRIPTION,
+    priceInCents: 79000,
     currency: 'usd',
-    credits: 1000000,
-  },
-  enterprise_lifetime: {
-    productId: 'enterprise_lifetime',
-    productName: 'Enterprise',
-    planName: 'Enterprise Lifetime',
-    description: 'Enterprise Lifetime',
-    type: PaymentType.ONE_TIME,
-    priceInCents: 199900,
-    currency: 'usd',
-    credits: 10000000,
+    credits: 12000,
+    creditsValidDays: 366,
+    plan: {
+      name: 'Publishing Studio',
+      interval: PaymentInterval.YEAR,
+      intervalCount: 1,
+    },
   },
 };
 

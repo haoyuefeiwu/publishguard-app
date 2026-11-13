@@ -1,126 +1,118 @@
 {
   "nav": {
-    "features": "Features",
+    "studio": "Book Studio",
+    "guard": "Free KDP Guard",
+    "features": "Firewall & Specs",
     "pricing": "Pricing",
     "blog": "Blog"
   },
   "hero": {
-    "headline": "The headless engine for your next SaaS.",
-    "subheadline": "Auth, payments, subscriptions, credits, RBAC, CMS, and i18n — all pre-wired. Just build your product on top.",
-    "cta": "Get Started",
-    "secondary": "Dashboard"
-  },
-  "chips": {
-    "auth": "Authentication",
-    "payment": "Payments",
-    "subscription": "Subscriptions",
-    "credits": "Credits",
-    "rbac": "RBAC",
-    "i18n": "i18n",
-    "cms": "CMS",
-    "apikeys": "API Keys"
+    "badge": "26-Rule Amazon KDP Compliance Firewall + Dual-Format Studio",
+    "headline": "Publish KDP books that pass review and actually sell.",
+    "subheadline": "Other AI book tools generate generic thin prose that gets your KDP account suspended. PublishGuard runs 26 battle-tested compliance checks, checks Apple Books & OpenLibrary collisions, writes 18,000+ word monographs, and compiles print-ready 6×9 PDFs + Kindle EPUB 3.",
+    "cta": "Start Your Book Free",
+    "secondary": "Run Free 26-Rule Audit"
   },
   "features": {
-    "title": "Everything you need to ship",
-    "description": "Pre-wired business logic so you can focus on building your product.",
-    "auth": {
-      "title": "Authentication",
-      "description": "Email/password, Google, and GitHub OAuth — ready out of the box with session management and account linking."
+    "title": "Built to protect your KDP account — not just spit out AI text",
+    "description": "Every guardrail comes from real-world KDP review outcomes, preventing \"Disappointing Customer Experience\" blocks before you ever click Publish.",
+    "firewall": {
+      "title": "26-Rule Ban Firewall",
+      "description": "Scans for DSM-5 clinical/medical claims, promo/coupon words, fake publisher imprints, workbook scorecard triggers, and rectangular box CSS that get paperbacks rejected."
     },
-    "payment": {
-      "title": "Payments",
-      "description": "Stripe, PayPal, Alipay, WeChat Pay — checkout, subscriptions, webhooks, and order management."
+    "collision": {
+      "title": "Live Title Collision Radar",
+      "description": "Queries Apple Books and OpenLibrary in real time so your main title never collides with established bestsellers or triggers Option 1 impersonation flags."
     },
-    "rbac": {
-      "title": "Roles & Permissions",
-      "description": "Fine-grained RBAC with wildcard matching. Full admin panel for managing users, roles, and permissions."
+    "isolation": {
+      "title": "Cross-Pen Domain Isolation",
+      "description": "Enforces strict separation between pen names and companion domains plus a 7-day publishing cadence alert to eliminate multi-account linkage."
     },
-    "i18n": {
-      "title": "Internationalization",
-      "description": "English and Chinese built-in with locale-aware routing. Easy to extend with additional languages."
+    "writer": {
+      "title": "18,000–22,000 Word Deep Writer",
+      "description": "Rolling-memory chapter engine crafts authoritative non-fiction monographs with zero prompt leakage and dictionary-level compliance sanitization."
     },
-    "cms": {
-      "title": "Content Management",
-      "description": "Categories and posts with full CRUD, status management, and admin panel — build your blog or docs."
+    "print": {
+      "title": "Binary-Locked 6×9 Print PDF & Full Wrap",
+      "description": "Chrome Headless typesetting locks exact even page counts (100/120/150 pages) and computes exact cream/white spine width + barcode safe zones across 4 cover architectures."
     },
-    "credits": {
-      "title": "Credit System",
-      "description": "FIFO consumption, expiration, auto-grant on signup, and revocation — ready for usage-based billing."
+    "epub": {
+      "title": "Zero-Hang Kindle EPUB 3",
+      "description": "Strips external HTTP clickable links (preventing crawler 429 blocks), converts companion QR codes to 8-bit RGB PNG, and guarantees smooth Kindle Previewer 3 loading."
     }
   },
   "pricing": {
-    "title": "Pricing",
-    "description": "Choose the plan that works for you.",
+    "title": "Simple, transparent publishing credits",
+    "description": "Preview your 12-part outline and Chapter 1 free. Pay only when you are ready to export your complete print-ready bundle.",
+    "pass": "Single Book Pass",
     "monthly": "Monthly",
-    "yearly": "Yearly",
-    "lifetime": "Lifetime",
-    "popular": "Popular",
-    "best_value": "Best value",
-    "buy_lifetime": "Buy once",
-    "starter": "Starter",
-    "starter_desc": "For individuals",
-    "pro": "Pro",
-    "pro_desc": "For growing teams",
-    "enterprise": "Enterprise",
-    "enterprise_desc": "For large organizations",
-    "feature_1_project": "1 project",
-    "feature_5k_credits": "5,000 credits",
-    "feature_email_support": "Email support",
-    "feature_unlimited_projects": "Unlimited projects",
-    "feature_50k_credits": "50,000 credits",
-    "feature_priority_support": "Priority support",
-    "feature_api_access": "API access",
-    "feature_everything_pro": "Everything in Pro",
-    "feature_unlimited_credits": "Unlimited credits",
-    "feature_dedicated_support": "Dedicated support",
-    "feature_custom_integrations": "Custom integrations"
+    "yearly": "Yearly (Save 33%)",
+    "popular": "Most Popular",
+    "best_value": "Best Value",
+    "buy_once": "Unlock Single Book",
+    "start_sub": "Choose Plan",
+    "single_name": "Single Book Pass",
+    "single_desc": "No subscription required. Complete 1 full book end-to-end.",
+    "single_credits": "120 credits (valid 1 year)",
+    "pro_name": "Author Pro",
+    "pro_desc": "Built for safe weekly KDP cadence (~3 dual-format books/mo).",
+    "pro_credits": "360 credits / month",
+    "studio_name": "Publishing Studio",
+    "studio_desc": "Multi-pen-name matrix isolation & highest rendering priority.",
+    "studio_credits": "1,000 credits / month",
+    "feature_guard_unlimited": "Unlimited 26-rule KDP Guard scans",
+    "feature_dual_bundle": "EPUB 3 + 6×9 Print PDF + Full Wrap Cover",
+    "feature_four_covers": "All 4 de-homogenized cover architectures",
+    "feature_ai_sanitize": "AI one-click compliance sanitization",
+    "feature_pen_isolation": "Cross-pen domain & cadence firewall",
+    "feature_priority_worker": "Priority Chrome Headless PDF worker"
   },
   "faq": {
     "title": "Frequently asked questions",
-    "description": "Everything you need to know before getting started.",
-    "stack": {
-      "question": "What's the tech stack?",
-      "answer": "Next.js 16 with the App Router, React 19, TypeScript strict mode, Tailwind CSS 4, shadcn/ui, Drizzle ORM, and better-auth. Every piece of business logic is inlined — no external packages for payment, email, storage, or AI."
+    "description": "Why publishers switch from generic ebook generators to PublishGuard.",
+    "ban_risk": {
+      "question": "How is PublishGuard different from getebook.ai or BookBud?",
+      "answer": "Generic generators stop at exporting AI prose. PublishGuard integrates a 26-rule KDP compliance firewall (blocking clinical words, promo codes, external eBook hyperlinks, and low-content box layouts), live title collision checks, and exact KDP spine-width wrap cover engineering."
     },
-    "payment": {
-      "question": "Which payment providers are supported?",
-      "answer": "Stripe, PayPal, Creem, Alipay, and WeChat Pay out of the box. The PaymentManager abstraction makes it straightforward to add more providers by implementing a single interface."
+    "word_count": {
+      "question": "Why does PublishGuard target 18,000+ words instead of short booklets?",
+      "answer": "Amazon KDP aggressively flags thin booklets under 10,000 words as \"Disappointing Customer Experience\" (Thin Content). Our rolling-memory pipeline structures 12 deep sections reaching 18,000–22,000 words for solid 100-page paperback authority."
     },
-    "database": {
-      "question": "Which databases can I use?",
-      "answer": "Drizzle ORM handles PostgreSQL, MySQL, SQLite, Turso, and Cloudflare D1. Switch providers by editing DATABASE_PROVIDER in your .env — the schema templates and drizzle config adapt automatically."
+    "ownership": {
+      "question": "Do I own 100% of the commercial rights and royalties?",
+      "answer": "Yes. You retain 100% copyright, publishing rights, and Amazon KDP royalties. PublishGuard never embeds ads, hidden publisher imprints, or affiliate watermarks inside your files."
     },
-    "customize": {
-      "question": "How customizable is the landing page?",
-      "answer": "The src/blocks/ directory ships with demo sections — they're designed to be rewritten per project. The durable primitives live in src/components/, so your rebrand touches blocks and translations, not the chassis."
+    "kdp_setup": {
+      "question": "Does it help me fill out the Amazon KDP dashboard?",
+      "answer": "Every generated bundle includes a copy-ready KDP Metadata Checklist mapped strictly to Amazon's 31 official top-level categories, 7 ≤50-char backend keywords, and character-safe non-formulaic subtitles."
     },
-    "license": {
-      "question": "Can I use this for commercial projects?",
-      "answer": "Yes. ShipAny Next is built for shipping production SaaS products. You own the code after cloning — no per-seat fees, no runtime dependencies on our infrastructure."
+    "refund": {
+      "question": "What happens if a generation job fails?",
+      "answer": "Our credit ledger is atomic: if a worker fails before delivering your verified EPUB/PDF bundle, 100% of deducted credits are automatically revoked back to your balance."
     }
   },
   "blog": {
-    "title": "From the blog",
-    "description": "Product updates, guides, and engineering notes from the team.",
-    "view_all": "View all posts"
+    "title": "KDP Compliance & Publishing Notes",
+    "description": "Practical guides on surviving KDP review, niche research, and formatting.",
+    "view_all": "View all guides"
   },
   "cta": {
-    "headline": "Ready to ship your SaaS?",
-    "subheadline": "Stop wiring auth, payments, and RBAC from scratch. Start with ShipAny Next and build what actually makes your product unique.",
-    "button": "Get started for free"
+    "headline": "Stop gambling with your KDP account.",
+    "subheadline": "Start with 30 free trial credits, test your next title against our 26-rule firewall, and preview Chapter 1 free.",
+    "button": "Open Book Studio"
   },
   "footer": {
-    "tagline": "Ship faster, iterate smarter.",
-    "feature": "Feature",
-    "product": "Product",
+    "tagline": "Ban-proof Amazon KDP publishing infrastructure.",
+    "feature": "Platform",
+    "product": "Tools",
     "resources": "Resources",
     "legal": "Legal",
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
-    "settings": "Settings",
+    "settings": "Account Settings",
     "admin": "Admin Panel",
     "blog": "Blog",
-    "docs": "Documentation",
-    "github": "GitHub"
+    "docs": "Free KDP Guard",
+    "github": "Book Studio"
   }
 }
