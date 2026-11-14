@@ -270,13 +270,18 @@ export async function grantForNewUser(params: {
 }) {
   const { userId, userEmail, configs } = params;
 
-  if (configs.initial_credits_enabled !== 'true') return;
+  // 若后台尚未持久化配置，默认启用 30 积分新手礼（仅显式设为 false 时关闭）
+  const enabled = configs.initial_credits_enabled ?? 'true';
+  if (enabled !== 'true') return;
 
-  const credits = parseInt(configs.initial_credits_amount) || 0;
+  const credits = parseInt(configs.initial_credits_amount ?? '30', 10) || 0;
   if (credits <= 0) return;
 
-  const validDays = parseInt(configs.initial_credits_valid_days) || 0;
-  const description = configs.initial_credits_description || 'Initial credits';
+  const validDays =
+    parseInt(configs.initial_credits_valid_days ?? '365', 10) || 0;
+  const description =
+    configs.initial_credits_description ||
+    'Welcome 30 Trial Credits (PublishGuard)';
 
   const expiresAt = calculateCreditExpirationTime({
     creditsValidDays: validDays,
