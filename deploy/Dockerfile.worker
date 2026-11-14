@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY worker/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt && useradd --system --uid 1001 worker
+RUN pip install --no-cache-dir -r requirements.txt && groupadd --gid 1000 worker && useradd --system --uid 1000 --gid 1000 worker
 COPY --chown=worker:worker worker/ ./worker/
 RUN mkdir -p /app/data/kdp-artifacts && chown -R worker:worker /app/data
 USER worker

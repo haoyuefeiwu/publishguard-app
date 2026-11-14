@@ -9,10 +9,11 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 COPY . .
-ARG APP_URL=https://publishguard.ai
+ARG APP_URL=https://getpublishguard.com
 ENV NEXT_PUBLIC_APP_URL=${APP_URL} \
     NEXT_PUBLIC_APP_NAME="PublishGuard" \
-    NEXT_PUBLIC_APP_DOMAIN="publishguard.ai" \
+    NEXT_PUBLIC_APP_DOMAIN="getpublishguard.com" \
+    NEXT_PUBLIC_SUPPORT_EMAIL="support@getpublishguard.com" \
     NEXT_PUBLIC_APP_DESCRIPTION="The Ban-Proof Amazon KDP Publishing & AI Book Studio" \
     NEXT_PUBLIC_DEFAULT_LOCALE=en \
     DOCKER=1
@@ -44,6 +45,7 @@ COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/worker ./worker
+RUN mkdir -p /app/data/kdp-artifacts && chown -R node:node /app/data
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]
