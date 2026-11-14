@@ -27,6 +27,26 @@ WORKER_DIR = Path(__file__).resolve().parent
 APP_ROOT = WORKER_DIR.parent
 sys.path.insert(0, str(WORKER_DIR))
 
+
+def _load_env_files() -> None:
+    """按优先级自动加载 .env.local / .env.development / .env，避免直接执行 worker/main.py 漏掉环境变量。"""
+    for name in (".env.local", ".env.development", ".env"):
+        env_file = APP_ROOT / name
+        if not env_file.exists():
+            continue
+        for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            key = k.strip()
+            val = v.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+
+_load_env_files()
+
 from book_writer import generate_chapter_html
 from cover_templates import build_ebook_front_cover_html
 from epub_compiler import compile_epub
