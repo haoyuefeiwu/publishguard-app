@@ -68,6 +68,25 @@ def _post_chat_completions(
         return str(data["choices"][0]["message"]["content"]).strip()
 
 
+def _extract_json_object(raw: str) -> dict[str, Any]:
+    """清洗模型输出的 Markdown 包裹并解析合法 JSON 对象。"""
+    cleaned = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned).strip()
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end > start:
+            parsed = json.loads(cleaned[start : end + 1])
+            if isinstance(parsed, dict):
+                return parsed
+        raise
+    raise ValueError("Model output did not parse to a JSON object")
+
+
 def call_openrouter_chat(
     *,
     messages: list[dict[str, str]],
@@ -78,17 +97,24 @@ def call_openrouter_chat(
     max_tokens: int = 4096,
     json_mode: bool = False,
 ) -> str:
-    """调用主网关（默认 Gemini / OpenRouter），失败（没额度/限流/超时）时自动切换到 DeepSeek 兜底。"""
-    try:
-        return _post_chat_completions(
+    """调用主网关（默认 Gemini / OpenRouter），失败（没额度/限流/超时/JSON 截断）时自动切换到 DeepSeek 兜底。"""
+    def _invoke_and_validate(use_model: str, use_key: str, use_base: str) -> str:
+        text = _post_chat_completions(
             messages=messages,
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
+            model=use_model,
+            api_key=use_key,
+            base_url=use_base,
             temperature=temperature,
             max_tokens=max_tokens,
             json_mode=json_mode,
         )
+        if json_mode:
+            # 提前校验 JSON 完整性，防止主模型被 max_tokens 截断时跳过 DeepSeek 兜底
+            _extract_json_object(text)
+        return text
+
+    try:
+        return _invoke_and_validate(model, api_key, base_url)
     except Exception as primary_err:
         fallback_key = os.environ.get("FALLBACK_API_KEY") or os.environ.get("DEEPSEEK_API_KEY", "")
         if not fallback_key or fallback_key == api_key:
@@ -96,18 +122,10 @@ def call_openrouter_chat(
         fallback_base = os.environ.get("FALLBACK_BASE_URL", "https://api.deepseek.com/v1")
         fallback_model = os.environ.get("FALLBACK_MODEL", "deepseek-chat")
         print(
-            f"[book_writer] 主模型 {model} 调用失败 ({type(primary_err).__name__})，自动切换兜底模型 {fallback_model}",
+            f"[book_writer] 主模型 {model} 调用失败 ({type(primary_err).__name__}: {primary_err})，自动切换兜底模型 {fallback_model}",
             file=sys.stderr,
         )
-        return _post_chat_completions(
-            messages=messages,
-            model=fallback_model,
-            api_key=fallback_key,
-            base_url=fallback_base,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            json_mode=json_mode,
-        )
+        return _invoke_and_validate(fallback_model, fallback_key, fallback_base)
 
 
 def _fallback_outline_payload(topic: str, audience: str, genre: str, companion_product: str) -> dict[str, Any]:
@@ -198,10 +216,10 @@ Return valid JSON only.
         api_key=api_key,
         base_url=base_url,
         temperature=0.65,
-        max_tokens=3000,
+        max_tokens=6500,
         json_mode=True,
     )
-    data = json.loads(raw)
+    data = _extract_json_object(raw)
     if data.get("primary_category") not in VALID_KDP_PRIMARY_CATEGORIES:
         data["primary_category"] = genre if genre in VALID_KDP_PRIMARY_CATEGORIES else "Self-Help"
     return data
@@ -282,7 +300,7 @@ Include:
         api_key=api_key,
         base_url=base_url,
         temperature=0.72,
-        max_tokens=4500,
+        max_tokens=7000,
     )
     # 剥离模型偶尔附带的 markdown ```html 包裹，并二次走确定性字典过滤确保 100% 安全
     html_out = re.sub(r"^```(?:html)?\s*", "", html_out, flags=re.IGNORECASE)
@@ -359,7 +377,7 @@ Original Text:
         api_key=api_key,
         base_url=base_url,
         temperature=0.3,
-        max_tokens=4500,
+        max_tokens=7000,
     )
     return quick_dictionary_sanitize(rewritten).strip()
 
