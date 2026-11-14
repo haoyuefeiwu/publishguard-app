@@ -2,6 +2,14 @@
   "title": "设置",
   "welcome": "欢迎回来，{name}",
   "placeholder": "你的应用内容在这里。",
+  "quick_actions": {
+    "studio_title": "新建 KDP 造书项目",
+    "studio_desc": "生成 20,000 词长篇专著、封面、EPUB 3 与 6x9 印刷 PDF。",
+    "guard_title": "26 项零风控体检仪",
+    "guard_desc": "提前扫描书名查重、敏感医疗词与违禁排版隐患。",
+    "profiles_title": "笔名防关联矩阵",
+    "profiles_desc": "按笔名严格隔离官网域名、作者署名与出版社标识。"
+  },
   "nav": {
     "studio": "造书工作台",
     "guard": "26项防封体检",
@@ -22,7 +30,7 @@
     "usage_description": "本月 API 调用次数",
     "apikeys_description": "活跃密钥",
     "getting_started": "开始使用",
-    "getting_started_description": "在这个引擎之上构建你的产品"
+    "getting_started_description": "一键进入 PublishGuard 核心合规出版流程"
   },
   "profile": {
     "title": "个人资料",

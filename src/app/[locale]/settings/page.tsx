@@ -1,10 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Activity, CreditCard, Key, TrendingUp } from 'lucide-react';
+import {
+  Activity,
+  ArrowRight,
+  BookOpen,
+  CreditCard,
+  Key,
+  ShieldCheck,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { useSession } from '@/core/auth/client';
+import { Link } from '@/core/i18n/navigation';
 import {
   Card,
   CardContent,
@@ -139,8 +149,60 @@ export default function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="border-border text-muted-foreground rounded-lg border border-dashed p-8 text-center">
-            <p className="text-sm">{t('settings.placeholder')}</p>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Link
+              href="/studio/new"
+              className="border-border hover:bg-muted/50 group flex flex-col justify-between rounded-lg border p-4 transition-colors"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <BookOpen className="text-foreground size-5" />
+                  <ArrowRight className="text-muted-foreground size-4 transition-transform group-hover:translate-x-0.5" />
+                </div>
+                <div className="font-medium">
+                  {t('settings.quick_actions.studio_title')}
+                </div>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  {t('settings.quick_actions.studio_desc')}
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              href="/tools/kdp-guard"
+              className="border-border hover:bg-muted/50 group flex flex-col justify-between rounded-lg border p-4 transition-colors"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <ShieldCheck className="text-foreground size-5" />
+                  <ArrowRight className="text-muted-foreground size-4 transition-transform group-hover:translate-x-0.5" />
+                </div>
+                <div className="font-medium">
+                  {t('settings.quick_actions.guard_title')}
+                </div>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  {t('settings.quick_actions.guard_desc')}
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              href="/studio/profiles"
+              className="border-border hover:bg-muted/50 group flex flex-col justify-between rounded-lg border p-4 transition-colors"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Users className="text-foreground size-5" />
+                  <ArrowRight className="text-muted-foreground size-4 transition-transform group-hover:translate-x-0.5" />
+                </div>
+                <div className="font-medium">
+                  {t('settings.quick_actions.profiles_title')}
+                </div>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  {t('settings.quick_actions.profiles_desc')}
+                </p>
+              </div>
+            </Link>
           </div>
         </CardContent>
       </Card>

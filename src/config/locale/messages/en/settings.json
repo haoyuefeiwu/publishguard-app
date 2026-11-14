@@ -2,6 +2,14 @@
   "title": "Settings",
   "welcome": "Welcome back, {name}",
   "placeholder": "Your app content goes here.",
+  "quick_actions": {
+    "studio_title": "New KDP Book Project",
+    "studio_desc": "Generate a 20,000-word manuscript, cover, EPUB 3 & 6x9 PDF.",
+    "guard_title": "26-Rule Pre-Flight Guard",
+    "guard_desc": "Scan titles, metadata, and manuscripts for ban risks.",
+    "profiles_title": "Pen Profile Firewall",
+    "profiles_desc": "Isolate domains and author identities across pen names."
+  },
   "nav": {
     "studio": "Book Studio",
     "guard": "KDP Guard",
@@ -22,7 +30,7 @@
     "usage_description": "API calls this month",
     "apikeys_description": "Active keys",
     "getting_started": "Getting Started",
-    "getting_started_description": "Build your product on top of this engine"
+    "getting_started_description": "Launch your next compliant KDP workflow"
   },
   "profile": {
     "title": "Profile",
