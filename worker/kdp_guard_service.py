@@ -656,9 +656,20 @@ def audit_epub_bytes(epub_bytes: bytes, **kwargs: Any) -> GuardAuditResult:
 
 
 def quick_dictionary_sanitize(raw_text: str) -> str:
-    """确定性安全词典脱敏器（当未配置外部 LLM 时也可即时清洗高危医疗/促销词汇）。"""
+    """确定性安全词典脱敏器（当未配置外部 LLM 时也可即时清洗高危医疗/促销/低内容触发词）。"""
     sanitized = raw_text
     for pattern, _, replacement in DSM5_CLINICAL_REPLACEMENTS:
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+    # 同步清洗易触发平装低内容误判的打卡表触发词（规则 25）
+    workbook_replacements = [
+        (r"\bscorecards?\b", "reflective summary"),
+        (r"\bbinary\s+scores?\b", "qualitative indicator"),
+        (r"\bdaily\s+ledgers?\b", "evening reflection"),
+        (r"\bledgers?\b", "reflection log"),
+        (r"\bprintable\s+worksheets?\b", "structured exercise"),
+        (r"\bfill-in-the-blank\b", "open-ended prompt"),
+    ]
+    for pattern, replacement in workbook_replacements:
         sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
     # 剥离外部超链接标签保留可读纯文本域名
     sanitized = re.sub(

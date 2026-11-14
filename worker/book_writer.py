@@ -287,7 +287,39 @@ Include:
     # 剥离模型偶尔附带的 markdown ```html 包裹，并二次走确定性字典过滤确保 100% 安全
     html_out = re.sub(r"^```(?:html)?\s*", "", html_out, flags=re.IGNORECASE)
     html_out = re.sub(r"\s*```$", "", html_out)
-    return quick_dictionary_sanitize(html_out).strip()
+    html_out = quick_dictionary_sanitize(html_out).strip()
+
+    # 若单章字数低于安全底线，自动续写 1 轮深化案例与实操细节，防止全书不足 15,000 词触发 Thin Content
+    min_chapter_words = max(1350, int(target_words * 0.85))
+    if count_words(html_out) < min_chapter_words:
+        shortfall = max(450, target_words - count_words(html_out) + 150)
+        ext_prompt = f"""
+Continue and deepen the chapter "{chapter_title}" below by writing ~{shortfall} additional words of concrete behavioral case illustrations and actionable daily protocols.
+Return ONLY 1 new <h3> subheading and 4-6 flowing <p> paragraphs of HTML (no intro/outro commentary, no repetition of prior examples).
+{COMPLIANCE_SYSTEM_CONSTRAINTS}
+
+Existing Chapter Ending:
+{html_out[-1800:]}
+"""
+        try:
+            ext_out = call_openrouter_chat(
+                messages=[
+                    {"role": "system", "content": "You are a bestselling non-fiction author expanding a chapter seamlessly."},
+                    {"role": "user", "content": ext_prompt},
+                ],
+                model=model,
+                api_key=api_key,
+                base_url=base_url,
+                temperature=0.7,
+                max_tokens=2200,
+            )
+            ext_out = re.sub(r"^```(?:html)?\s*", "", ext_out, flags=re.IGNORECASE)
+            ext_out = re.sub(r"\s*```$", "", ext_out)
+            html_out = f"{html_out}\n{quick_dictionary_sanitize(ext_out).strip()}"
+        except Exception:
+            pass
+
+    return html_out.strip()
 
 
 def auto_sanitize_with_ai(

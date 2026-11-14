@@ -20,6 +20,10 @@ import main as worker_main
 
 
 def test_sqlite_worker_claims_and_completes_book_job(tmp_path: Path, monkeypatch) -> None:
+    # 单元测试隔离外部 LLM 密钥，保持队列抢单与编译测试确定性且快速执行
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("FALLBACK_API_KEY", "")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "")
     db_file = tmp_path / "test_queue.db"
     artifacts_dir = tmp_path / "artifacts"
     monkeypatch.setattr(worker_main, "ARTIFACTS_ROOT", artifacts_dir)
