@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -49,6 +50,31 @@ def count_pdf_pages(pdf_path: Path) -> int:
     return len(re.findall(rb"/Type\s*/Page\b", data))
 
 
+def _chromium_subprocess_env(profile_dir: str) -> dict[str, str]:
+    """Linux 容器内无头 Chromium 需要可写的 HOME / XDG 目录，macOS Chrome 则沿用系统 HOME（Keychain 依赖）。"""
+    env = os.environ.copy()
+    if sys.platform != "darwin":
+        home = env.get("HOME", "")
+        if not home or not os.path.isdir(home) or not os.access(home, os.W_OK):
+            env["HOME"] = profile_dir
+        env["XDG_CONFIG_HOME"] = f"{profile_dir}/.config"
+        env["XDG_CACHE_HOME"] = f"{profile_dir}/.cache"
+    return env
+
+
+def _chromium_common_flags(profile_dir: str) -> list[str]:
+    flags = [
+        "--headless=new",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        f"--user-data-dir={profile_dir}",
+        "--disable-gpu",
+    ]
+    if sys.platform != "darwin":
+        flags.append("--disable-dev-shm-usage")
+    return flags
+
+
 def render_html_to_pdf(html_path: Path, pdf_path: Path, timeout_sec: int = 25) -> None:
     """使用独立隔离临时 User-Data-Dir 调起 Chrome Headless 导出印刷级无页眉页脚 PDF。"""
     chrome_bin = resolve_chrome_binary()
@@ -60,11 +86,7 @@ def render_html_to_pdf(html_path: Path, pdf_path: Path, timeout_sec: int = 25) -
         with tempfile.TemporaryDirectory() as tmp_profile:
             cmd = [
                 chrome_bin,
-                "--headless=new",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                f"--user-data-dir={tmp_profile}",
-                "--disable-gpu",
+                *_chromium_common_flags(tmp_profile),
                 "--no-first-run",
                 "--no-default-browser-check",
                 "--no-pdf-header-footer",
@@ -77,6 +99,7 @@ def render_html_to_pdf(html_path: Path, pdf_path: Path, timeout_sec: int = 25) -
                     cmd,
                     check=True,
                     timeout=timeout_sec,
+                    env=_chromium_subprocess_env(tmp_profile),
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
@@ -94,17 +117,21 @@ def render_cover_front_jpg(html_path: Path, jpg_path: Path, timeout_sec: int = 2
     with tempfile.TemporaryDirectory() as tmp_profile:
         cmd = [
             chrome_bin,
-            "--headless=new",
-            "--no-sandbox",
-            f"--user-data-dir={tmp_profile}",
-            "--disable-gpu",
+            *_chromium_common_flags(tmp_profile),
             "--hide-scrollbars",
             "--window-size=1600,2560",
             "--force-device-scale-factor=1",
             f"--screenshot={png_path}",
             f"file://{html_path.resolve()}",
         ]
-        subprocess.run(cmd, check=True, timeout=timeout_sec, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            cmd,
+            check=True,
+            timeout=timeout_sec,
+            env=_chromium_subprocess_env(tmp_profile),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     from PIL import Image
 

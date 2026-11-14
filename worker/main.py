@@ -79,7 +79,9 @@ def _db_config_lookup(conn: Any, is_sqlite: bool) -> dict[str, str]:
     try:
         cur = conn.cursor()
         cur.execute("SELECT name, value FROM config WHERE name IN ('openrouter_api_key', 'openrouter_base_url', 'kdp_writer_model', 'kdp_outline_model')")
-        for name, val in cur.fetchall():
+        for row in cur.fetchall():
+            name = row["name"] if isinstance(row, dict) else row[0]
+            val = row["value"] if isinstance(row, dict) else row[1]
             # 仅当值非加密密文且非空时直接读取（加密配置建议通过环境变量或明文透传 payload）
             if val and not str(val).startswith("enc:"):
                 keys[name] = str(val)
@@ -261,9 +263,10 @@ def _refund_credit_on_failure_pg(cur: Any, credit_id: str) -> None:
         (credit_id,),
     )
     row = cur.fetchone()
-    if not row or not row[0]:
+    consumed_raw = (row.get("consumed_detail") if isinstance(row, dict) else row[0]) if row else None
+    if not consumed_raw:
         return
-    items = json.loads(row[0])
+    items = json.loads(consumed_raw)
     for item in items:
         cur.execute(
             "UPDATE credit SET remaining_credits = remaining_credits + %s WHERE id = %s",
@@ -278,7 +281,8 @@ def run_once_postgres(dsn: str) -> bool:
     from psycopg.rows import dict_row
 
     lease_id = str(uuid.uuid4())
-    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+    # autocommit=True 确保每条 conn.transaction() 立即独立提交，防止进度/章节更新被外层隐式事务锁成 Savepoint
+    with psycopg.connect(dsn, row_factory=dict_row, autocommit=True) as conn:
         with conn.transaction():
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_try_advisory_xact_lock(hashtext('kdp_job_claim'))")
@@ -402,6 +406,8 @@ def run_once_postgres(dsn: str) -> bool:
                         (json.dumps(result, ensure_ascii=False), job["id"]),
                     )
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             with conn.transaction():
                 with conn.cursor() as cur:
                     _refund_credit_on_failure_pg(cur, job.get("credit_id") or "")

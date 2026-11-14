@@ -4,7 +4,10 @@ LABEL org.opencontainers.image.revision=${SOURCE_REVISION}
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    CHROME_BIN=/usr/bin/chromium
+    CHROME_BIN=/usr/bin/chromium \
+    HOME=/home/worker \
+    XDG_CONFIG_HOME=/tmp/.config \
+    XDG_CACHE_HOME=/tmp/.cache
 
 # 安装无头 Chromium 及专业中英文印刷级衬线/无衬线字体
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,6 +20,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY worker/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && groupadd --gid 1000 worker && useradd --system --uid 1000 --gid 1000 worker
 COPY --chown=worker:worker worker/ ./worker/
-RUN mkdir -p /app/data/kdp-artifacts && chown -R worker:worker /app/data
+RUN mkdir -p /app/data/kdp-artifacts /home/worker && chown -R worker:worker /app/data /home/worker
 USER worker
 CMD ["python", "worker/main.py"]
