@@ -41,7 +41,10 @@ export function AppLayout({
   const { data: session, isPending } = useSession();
   const router = useRouter();
   const locale = useLocale();
-  const [authorized, setAuthorized] = useState(false);
+  const userId = session?.user?.id ?? null;
+  const authKey = userId ? `${userId}:${requirePermission ?? ''}` : null;
+  const [authorizedKey, setAuthorizedKey] = useState<string | null>(null);
+  const authorized = Boolean(authKey && authorizedKey === authKey);
   // Redirect to sign-in exactly once, so a re-render mid-navigation can't
   // recapture the callbackUrl as the sign-in path itself.
   const redirectingRef = useRef(false);
@@ -49,8 +52,8 @@ export function AppLayout({
   useEffect(() => {
     if (isPending) return;
 
-    if (!session?.user) {
-      setAuthorized(false);
+    if (!userId || !authKey) {
+      setAuthorizedKey(null);
       if (redirectingRef.current) return;
       redirectingRef.current = true;
       // Remember where the user was headed so sign-in can send them back.
@@ -66,8 +69,10 @@ export function AppLayout({
       return;
     }
 
+    // 同一用户且同一权限作用域已校验通过时，不卸载子页面避免切回标签页时重置状态
+    if (authorizedKey === authKey) return;
+
     let cancelled = false;
-    setAuthorized(false);
     (async () => {
       // Invite-only gate: a new user (incl. social logins) with no redeemed
       // invite must redeem one before entering the app. Admins are exempt
@@ -86,14 +91,15 @@ export function AppLayout({
       if (cancelled) return;
 
       if (!requirePermission) {
-        setAuthorized(true);
+        setAuthorizedKey(authKey);
         return;
       }
 
       try {
         const res = await fetch('/api/user/permissions').then((r) => r.json());
         if (cancelled) return;
-        if (res.code === 0 && res.data?.isAdmin === true) setAuthorized(true);
+        if (res.code === 0 && res.data?.isAdmin === true)
+          setAuthorizedKey(authKey);
         else router.push(unauthorizedRedirect);
       } catch {
         if (!cancelled) router.push(unauthorizedRedirect);
@@ -104,14 +110,16 @@ export function AppLayout({
     };
   }, [
     isPending,
-    session,
+    userId,
+    authKey,
+    authorizedKey,
     router,
     locale,
     requirePermission,
     unauthorizedRedirect,
   ]);
 
-  if (isPending || !authorized || !session?.user) {
+  if (!authorized || !session?.user) {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">

@@ -6,7 +6,13 @@ const baseURL =
     ? window.location.origin
     : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-export const authClient = createAuthClient({ baseURL });
+export const authClient = createAuthClient({
+  baseURL,
+  sessionOptions: {
+    // 切换浏览器标签页时不触发窗口聚焦刷新，避免表单与工作台状态重置
+    refetchOnWindowFocus: false,
+  },
+});
 
 export const {
   signIn,
@@ -23,6 +29,9 @@ export const {
 export function getAuthClient(configs: Record<string, string>) {
   return createAuthClient({
     baseURL,
+    sessionOptions: {
+      refetchOnWindowFocus: false,
+    },
     plugins:
       configs.google_client_id && configs.google_one_tap_enabled === 'true'
         ? [
