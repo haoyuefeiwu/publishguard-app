@@ -1,0 +1,41 @@
+import { cn } from '@/lib/utils';
+
+/**
+ * PublishGuard 品牌徽标：墨黑圆角底框 + 书页护盾轮廓 + 合规翡翠绿对勾。
+ */
+export function BrandLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 512 512"
+      role="img"
+      aria-label="PublishGuard"
+      className={cn('size-7 shrink-0', className)}
+    >
+      <rect width="512" height="512" rx="116" fill="#171614" />
+      <path
+        d="M256 78L404 130V250C404 340 340 406 256 436C172 406 108 340 108 250V130L256 78Z"
+        fill="none"
+        stroke="#FAF8F5"
+        strokeWidth="34"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M168 232C198 224 226 230 245 244V340C226 328 198 323 168 330V232Z"
+        fill="#FAF8F5"
+      />
+      <path
+        d="M344 232C314 224 286 230 267 244V340C286 328 314 323 344 330V232Z"
+        fill="#FAF8F5"
+      />
+      <path
+        d="M214 176L244 204L304 148"
+        fill="none"
+        stroke="#10B981"
+        strokeWidth="32"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

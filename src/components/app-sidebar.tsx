@@ -5,6 +5,7 @@ import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { useLocale } from 'next-intl';
 
 import { Link, usePathname } from '@/core/i18n/navigation';
+import { BrandLogo } from '@/components/brand-logo';
 import {
   Sidebar,
   SidebarContent,
@@ -134,8 +135,9 @@ export function AppSidebar({
           <SidebarMenuItem>
             <Link
               href={brandHref}
-              className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+              className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm"
             >
+              <BrandLogo className="size-6" />
               <span className="flex-1 font-serif text-lg leading-none italic">
                 {brand}
               </span>

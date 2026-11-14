@@ -30,14 +30,14 @@ export const metadata: Metadata = {
   },
   description: envConfigs.app_description,
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
+    icon: '/favicon.svg?v=2',
+    shortcut: '/favicon.svg?v=2',
+    apple: '/favicon.svg?v=2',
   },
   openGraph: {
     siteName: envConfigs.app_name,
     type: 'website',
-    images: ['/logo.svg'],
+    images: ['/logo.svg?v=2'],
   },
   twitter: {
     card: 'summary',

@@ -8,6 +8,7 @@ import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/brand-logo';
 import { LocaleSelector } from '@/components/locale-selector';
 import { SiteUserMenu } from '@/components/site-user-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -33,7 +34,8 @@ export function SiteHeader({ navLinks }: { navLinks?: NavLink[] }) {
     <header className="bg-background/80 sticky top-0 z-50 w-full backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         {/* Brand */}
-        <Link href="/" className="flex items-center">
+        <Link href="/" className="flex items-center gap-2.5">
+          <BrandLogo className="size-7" />
           <span className="font-serif text-lg italic">
             {envConfigs.app_name}
           </span>
