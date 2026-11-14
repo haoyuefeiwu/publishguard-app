@@ -1,0 +1,26 @@
+export const meta = {
+  title:
+    '为什么亚马逊 KDP 会判「令人失望的客户体验」封书？（26 项上线前必查清单）',
+  description:
+    '从真金白银踩坑总结出的平装排版、DSM-5 医疗禁词、外链 429 爬虫误判与跨笔名关联自查指南。',
+  created_at: '2026-11-14',
+  author_name: 'PublishGuard 编辑团队',
+};
+
+很多独立作者以为只有抄袭侵权才会被 KDP 拒稿或封号，但现实中大量 **Disappointing Customer Experience（令人失望的客户体验）** 驳回，往往出自极其隐蔽的排版、元数据或外链陷阱：
+
+## 1. 平装书被人工巡检误判为低内容手账
+
+在申请免费 KDP ISBN 的非虚构书籍中，如果内页存在大量带四周边框的方框卡片，或者正文中频繁出现 _Scorecard_、_Daily Ledger_、_Printable Worksheet_，人工缩略图巡检极易将其判定为「低内容分类欺瞒」。严肃非虚构专著应保持 **15,000 词以上**纯正连续散文排版，彻底取消矩形方框 CSS。
+
+## 2. DSM-5 临床疾病词与医学速效宣称
+
+标题、副标题或简介出现 _panic attack_、_insomnia_、_cure anxiety_ 等临床诊断词汇或 _60-second miracle_ 等速效承诺，会直接触发医疗合规拦截。商业安全做法是降维替换为中性生活化表达（如 _sensory overwhelm_、_restless evenings_、_mindful calibration_）。
+
+## 3. 电子书内嵌外链被爬虫判 HTTP 429
+
+亚马逊 Kindle 审核爬虫在抓取 `.epub` 内部可点击外部链接时，若遇到目标站点跳转或限流返回 429，会在数小时内直接封锁单本图书。电子书内页请仅保留内部章节锚点，伴读域名以纯文本展示。
+
+## 上线前先过一遍 26 项合规体检
+
+上传至 KDP 后台前，欢迎直接使用免费的 [KDP Pre-Flight 26 项合规雷达](/tools/kdp-guard) 一键检测书名撞车、简介与 `.epub` 二进制包。

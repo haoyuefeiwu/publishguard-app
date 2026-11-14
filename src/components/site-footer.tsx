@@ -2,8 +2,8 @@ import type { ComponentType, SVGProps } from 'react';
 
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { BRAND_CONFIG } from '@/config/brand';
 import { cn } from '@/lib/utils';
-import { BuiltWithShipAny } from '@/components/built-with-shipany';
 import { LocaleSelector } from '@/components/locale-selector';
 
 export interface FooterColumn {
@@ -116,7 +116,15 @@ export function SiteFooter({
 
         {/* Bottom bar */}
         <div className="mt-6 flex flex-col gap-3 border-t border-neutral-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <BuiltWithShipAny />
+          <span className="text-xs text-neutral-400">
+            Independent KDP Compliance &amp; Publishing Platform ·{' '}
+            <a
+              href={`mailto:${BRAND_CONFIG.supportEmail}`}
+              className="underline decoration-neutral-700 underline-offset-4 hover:text-neutral-200"
+            >
+              {BRAND_CONFIG.supportEmail}
+            </a>
+          </span>
           <span className="text-sm text-neutral-400">
             {copyright ||
               `© ${year} ${envConfigs.app_name}. All rights reserved.`}

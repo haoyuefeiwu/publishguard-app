@@ -1,0 +1,29 @@
+export const meta = {
+  title:
+    'Why Amazon KDP Flags Books for "Disappointing Customer Experience" (26-Rule Pre-Flight Checklist)',
+  description:
+    'A practical breakdown of the hidden manuscript, CSS, metadata, and link triggers that trigger KDP blocks—and how to audit your book before hitting Publish.',
+  created_at: '2026-11-14',
+  author_name: 'PublishGuard Editorial Team',
+};
+
+Most independent authors assume KDP rejections only happen for copyright plagiarism or obvious AI spam. In reality, many accounts run into **"Disappointing Customer Experience"** blocks over subtle structural details that automated scanners and print-review thumbnail inspectors flag instantly.
+
+## 1. Thin Content & Low-Content ISBN Misclassification
+
+Applying for a free KDP ISBN on a 40-page pamphlet or a manuscript padded with boxy scorecard tables and blank fill-in prompts frequently triggers misleading-classification rejections.
+
+- Keep serious non-fiction monographs **above 15,000+ words** of cohesive prose.
+- Eliminate rectangular bordered card boxes and words like _Scorecard_, _Daily Ledger_, or _Printable Worksheet_ from print interiors unless publishing explicitly under Low Content rules.
+
+## 2. Clinical DSM-5 & Miracle Cure Phrasing
+
+Using medical diagnostic nouns (_panic attacks_, _insomnia_, _clinical anxiety_, _PTSD_, _ADHD_) alongside promises like _"60-second miracle"_ or _"cure in real time"_ violates marketplace health-claim policies. Reframe lifestyle guidance around grounded everyday habits: _sensory overwhelm_, _restless evenings_, and _mindful grounding_.
+
+## 3. Broken eBook Hyperlinks (HTTP 429)
+
+When KDP's headless crawler verifies external `<a href="http...">` links inside your `.epub`, storefront redirects or rate-limited landing pages frequently return `429 Too Many Requests`. Remove clickable external HTTP links inside the eBook interior and display plain-text companion URLs instead.
+
+## Run a Free 26-Rule Check Before Submitting
+
+Test your title, subtitle, blurb, or `.epub` binary right now using the free [KDP Guard Pre-Flight Scanner](/tools/kdp-guard) before uploading to KDP.

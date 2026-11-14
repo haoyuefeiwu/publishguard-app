@@ -33,7 +33,7 @@ services:
       dockerfile: deploy/Dockerfile.web
       target: web
       args:
-        APP_URL: ${NEXT_PUBLIC_APP_URL:-https://publishguard.ai}
+        APP_URL: ${NEXT_PUBLIC_APP_URL:-https://getpublishguard.com}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -41,11 +41,22 @@ services:
     environment:
       DATABASE_PROVIDER: postgres
       DATABASE_URL: postgresql://publishguard:${POSTGRES_PASSWORD}@postgres:5432/publishguard
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://publishguard.ai}
-      AUTH_URL: ${NEXT_PUBLIC_APP_URL:-https://publishguard.ai}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://getpublishguard.com}
+      AUTH_URL: ${NEXT_PUBLIC_APP_URL:-https://getpublishguard.com}
       AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
       CONFIG_ENCRYPTION_KEY: ${CONFIG_ENCRYPTION_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      KDP_OUTLINE_MODEL: ${KDP_OUTLINE_MODEL:-gemini-flash-latest}
+      KDP_WRITER_MODEL: ${KDP_WRITER_MODEL:-gemini-flash-latest}
+      KDP_SANITIZER_MODEL: ${KDP_SANITIZER_MODEL:-gemini-flash-latest}
+      FALLBACK_API_KEY: ${FALLBACK_API_KEY:-}
+      FALLBACK_BASE_URL: ${FALLBACK_BASE_URL:-https://api.deepseek.com/v1}
+      FALLBACK_MODEL: ${FALLBACK_MODEL:-deepseek-chat}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_SIGNING_SECRET: ${STRIPE_SIGNING_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       KDP_ARTIFACTS_DIR: /app/data/kdp-artifacts
     volumes:
       - kdp_artifacts:/app/data/kdp-artifacts
@@ -63,10 +74,15 @@ services:
     environment:
       DATABASE_PROVIDER: postgres
       DATABASE_URL: postgresql://publishguard:${POSTGRES_PASSWORD}@postgres:5432/publishguard
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://getpublishguard.com}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      KDP_OUTLINE_MODEL: ${KDP_OUTLINE_MODEL:-google/gemini-2.5-flash}
-      KDP_WRITER_MODEL: ${KDP_WRITER_MODEL:-anthropic/claude-sonnet-4}
-      KDP_SANITIZER_MODEL: ${KDP_SANITIZER_MODEL:-google/gemini-2.5-flash}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      KDP_OUTLINE_MODEL: ${KDP_OUTLINE_MODEL:-gemini-flash-latest}
+      KDP_WRITER_MODEL: ${KDP_WRITER_MODEL:-gemini-flash-latest}
+      KDP_SANITIZER_MODEL: ${KDP_SANITIZER_MODEL:-gemini-flash-latest}
+      FALLBACK_API_KEY: ${FALLBACK_API_KEY:-}
+      FALLBACK_BASE_URL: ${FALLBACK_BASE_URL:-https://api.deepseek.com/v1}
+      FALLBACK_MODEL: ${FALLBACK_MODEL:-deepseek-chat}
       KDP_ARTIFACTS_DIR: /app/data/kdp-artifacts
     volumes:
       - kdp_artifacts:/app/data/kdp-artifacts

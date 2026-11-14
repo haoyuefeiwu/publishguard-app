@@ -49,7 +49,7 @@ def _post_chat_completions(
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": os.environ.get("NEXT_PUBLIC_APP_URL", "https://publishguard.ai"),
+        "HTTP-Referer": os.environ.get("NEXT_PUBLIC_APP_URL", "https://getpublishguard.com"),
         "X-Title": "PublishGuard Studio",
     }
     body: dict[str, Any] = {

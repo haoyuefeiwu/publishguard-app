@@ -12,8 +12,8 @@ import {
  * Register every local post slug here — it drives loading and static params.
  */
 export const BLOG_POST_SLUGS = [
-  'what-is-shipany',
-  'blocks-vs-components',
+  'kdp-disappointing-experience-checklist',
+  'paperback-vs-ebook-kdp-compliance',
 ] as const;
 
 export type BlogPostMeta = {
