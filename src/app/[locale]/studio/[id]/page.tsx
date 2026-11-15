@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
+  AlertTriangle,
   Check,
   CheckCircle2,
   Copy,
@@ -11,6 +12,7 @@ import {
   FileText,
   Loader2,
   Lock,
+  RefreshCw,
   Rocket,
   ShieldAlert,
   ShieldCheck,
@@ -20,6 +22,7 @@ import { toast } from 'sonner';
 
 import { Link } from '@/core/i18n/navigation';
 import { KDP_COVER_THEMES } from '@/modules/kdp/constants';
+import { sanitizeChapterHtml } from '@/lib/html-sanitizer';
 import { cn } from '@/lib/utils';
 import { KdpCoverThumbnail } from '@/components/kdp-cover-thumbnail';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -40,6 +43,7 @@ export default function StudioProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [previewing, setPreviewing] = useState(false);
   const [compiling, setCompiling] = useState(false);
+  const [recompiling, setRecompiling] = useState(false);
   const [copiedKey, setCopiedKey] = useState('');
 
   const loadDetail = useCallback(async () => {
@@ -93,28 +97,38 @@ export default function StudioProjectDetailPage() {
   }
 
   async function handleThemeChange(themeId: string) {
-    const res = await fetch(`/api/kdp/projects/${projectId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cover_theme: themeId }),
-    });
-    const json = await res.json();
-    if (json.code === 0) {
-      toast.success('Cover architecture updated');
+    try {
+      const res = await fetch(`/api/kdp/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_theme: themeId }),
+      });
+      const json = await res.json();
+      if (json.code !== 0) {
+        throw new Error(json.message || 'Failed to update cover theme');
+      }
+      toast.success(t('toast_theme_updated'));
       await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update cover theme');
     }
   }
 
   async function handleTitleSelect(newTitle: string) {
-    const res = await fetch(`/api/kdp/projects/${projectId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newTitle }),
-    });
-    const json = await res.json();
-    if (json.code === 0) {
-      toast.success('Main title updated');
+    try {
+      const res = await fetch(`/api/kdp/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      const json = await res.json();
+      if (json.code !== 0) {
+        throw new Error(json.message || 'Failed to update book title');
+      }
+      toast.success(t('toast_title_updated'));
       await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update book title');
     }
   }
 
@@ -135,6 +149,23 @@ export default function StudioProjectDetailPage() {
     }
   }
 
+  async function handleQuickRecompile() {
+    setRecompiling(true);
+    try {
+      const res = await fetch(`/api/kdp/projects/${projectId}/recompile`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (json.code !== 0) throw new Error(json.message);
+      toast.success(t('toast_recompile_enqueued'));
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.message || 'Quick recompile failed');
+    } finally {
+      setRecompiling(false);
+    }
+  }
+
   function copyValue(key: string, val: string) {
     navigator.clipboard.writeText(val);
     setCopiedKey(key);
@@ -150,54 +181,126 @@ export default function StudioProjectDetailPage() {
     );
   }
 
-  const { project, chapters, latestJob, penProfile, credits } = detail;
+  const {
+    project,
+    chapters,
+    latestJob,
+    latestSucceededJob,
+    compiledSnapshot,
+    penProfile,
+    credits,
+  } = detail;
   const meta = JSON.parse(project.metadataJson || '{}');
-  let jobResult: Record<string, any> = {};
+  let succeededResult: Record<string, any> = {};
   try {
-    jobResult = JSON.parse(latestJob?.resultJson || '{}');
+    succeededResult = JSON.parse(latestSucceededJob?.resultJson || '{}');
   } catch {
-    jobResult = {};
+    succeededResult = {};
   }
+  const activeSnapshot: Record<string, any> | null =
+    compiledSnapshot || succeededResult?.compiled_snapshot || null;
+
   const titleOptions: string[] = meta.title_options || [project.title];
   const keywords: string[] = meta.keywords || [];
   const previewChapter = chapters.find((c: any) => Boolean(c.contentHtml));
+  const hasFullManuscript =
+    chapters.length > 0 &&
+    chapters.every((c: any) => Boolean((c.contentHtml || '').trim()));
+
   const isWorking =
     project.status === 'queued' ||
     project.status === 'generating' ||
     latestJob?.status === 'queued' ||
     latestJob?.status === 'processing';
-  const isReady = project.status === 'ready' && Boolean(project.bundleZipKey);
+  const hasDeliverables = Boolean(project.bundleZipKey);
+  const isReady = hasDeliverables && project.status === 'ready';
 
-  // 实时书脊物理尺寸计算：编译完成后优先使用真实统计页数与实际书脊厚度
-  const pageThickness = project.paperType === 'white' ? 0.002252 : 0.0025;
-  const compiledPages = Number(jobResult.actual_pages || 0);
-  const displayPages =
-    isReady && compiledPages > 0 ? compiledPages : project.targetPageCount;
-  const spineIn =
-    isReady && jobResult.spine_width_in
-      ? Number(jobResult.spine_width_in).toFixed(4)
-      : (displayPages * pageThickness).toFixed(4);
-  const [trimW, trimH] =
-    project.trimSize === '5.5x8.5' ? [5.5, 8.5] : [6.0, 9.0];
-  const wrapW = (0.125 + trimW + Number(spineIn) + trimW + 0.125).toFixed(4);
-  const wrapH = (0.125 + trimH + 0.125).toFixed(4);
+  // 若已导出交付包后又修改了书名、副标题、封面或规格，显式提示需要 10 积分快速重打包同步新资产
+  const isSnapshotStale =
+    Boolean(hasDeliverables && activeSnapshot) &&
+    (activeSnapshot?.title !== project.title ||
+      (activeSnapshot?.subtitle || '') !== (project.subtitle || '') ||
+      activeSnapshot?.cover_theme !== project.coverTheme ||
+      activeSnapshot?.trim_size !== project.trimSize ||
+      activeSnapshot?.paper_type !== project.paperType ||
+      Number(activeSnapshot?.target_page_count || project.targetPageCount) !==
+        Number(project.targetPageCount));
+
+  // 严格区分“当前草稿预估规格”与“已导出成品绑定快照规格”，避免误导作者上传 KDP 封面错位
+  const draftPageThickness = project.paperType === 'white' ? 0.002252 : 0.0025;
+  const draftSpineIn = (project.targetPageCount * draftPageThickness).toFixed(
+    4
+  );
+  const [draftTrimW, draftTrimH] =
+    project.trimSize === '5.5x8.5'
+      ? [5.5, 8.5]
+      : project.trimSize === '8.5x11'
+        ? [8.5, 11.0]
+        : [6.0, 9.0];
+  const draftWrapW = (
+    0.125 +
+    draftTrimW +
+    Number(draftSpineIn) +
+    draftTrimW +
+    0.125
+  ).toFixed(4);
+  const draftWrapH = (0.125 + draftTrimH + 0.125).toFixed(4);
+
+  const exportedTitle = activeSnapshot?.title || project.title;
+  const exportedCoverTheme = activeSnapshot?.cover_theme || project.coverTheme;
+  const exportedTrimSize = activeSnapshot?.trim_size || project.trimSize;
+  const exportedPaperType = activeSnapshot?.paper_type || project.paperType;
+  const exportedPages = Number(
+    activeSnapshot?.actual_pages ||
+      succeededResult?.actual_pages ||
+      project.targetPageCount
+  );
+  const exportedThickness = exportedPaperType === 'white' ? 0.002252 : 0.0025;
+  const exportedSpineIn = activeSnapshot?.spine_width_in
+    ? Number(activeSnapshot.spine_width_in).toFixed(4)
+    : succeededResult?.spine_width_in
+      ? Number(succeededResult.spine_width_in).toFixed(4)
+      : (exportedPages * exportedThickness).toFixed(4);
+  const [expTrimW, expTrimH] =
+    exportedTrimSize === '5.5x8.5'
+      ? [5.5, 8.5]
+      : exportedTrimSize === '8.5x11'
+        ? [8.5, 11.0]
+        : [6.0, 9.0];
+  const exportedWrapW = (
+    0.125 +
+    expTrimW +
+    Number(exportedSpineIn) +
+    expTrimW +
+    0.125
+  ).toFixed(4);
+  const exportedWrapH = (0.125 + expTrimH + 0.125).toFixed(4);
+  const exportedGuardPassed = Boolean(
+    activeSnapshot?.guard_passed ?? project.guardPassed
+  );
+  const exportedGuardScore = Number(
+    activeSnapshot?.guard_score ?? project.guardScore ?? 0
+  );
+  const exportedWordCount = Number(
+    activeSnapshot?.actual_word_count ?? project.actualWordCount ?? 0
+  );
+  const bundleCacheTag = encodeURIComponent(
+    String(activeSnapshot?.compiled_at || project.updatedAt || '1')
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
       {/* 顶部标题与积分条 */}
       <div className="flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-center">
         <div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="bg-muted rounded px-2 py-0.5 font-mono uppercase">
               {project.status}
             </span>
             <span className="text-muted-foreground">
-              {project.trimSize}&quot; ·{' '}
-              {isReady && compiledPages > 0
-                ? `${displayPages} actual pp`
-                : `${displayPages} target pp`}{' '}
-              {project.paperType} · Spine {spineIn}&quot; (Wrap {wrapW}&quot; ×{' '}
-              {wrapH}&quot;)
+              {isReady && !isSnapshotStale
+                ? `${exportedTrimSize}" · ${exportedPages} actual pp ${exportedPaperType} · Spine ${exportedSpineIn}" (Wrap ${exportedWrapW}" × ${exportedWrapH}")`
+                : `Draft ${project.trimSize}" · ${project.targetPageCount} target pp ${project.paperType} · Est. Spine ${draftSpineIn}" (Wrap ${draftWrapW}" × ${draftWrapH}")`}
             </span>
           </div>
           <h1 className="mt-2 font-serif text-2xl font-medium tracking-tight sm:text-3xl">
@@ -241,9 +344,10 @@ export default function StudioProjectDetailPage() {
                 <button
                   key={opt}
                   type="button"
+                  disabled={isWorking || compiling || recompiling}
                   onClick={() => handleTitleSelect(opt)}
                   className={cn(
-                    'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-xs transition-colors',
+                    'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                     project.title === opt
                       ? 'border-primary bg-primary/5 font-semibold'
                       : 'border-border hover:bg-muted/40'
@@ -262,9 +366,10 @@ export default function StudioProjectDetailPage() {
                   <button
                     key={th.id}
                     type="button"
+                    disabled={isWorking || compiling || recompiling}
                     onClick={() => handleThemeChange(th.id)}
                     className={cn(
-                      'rounded-lg border p-2 text-left text-xs transition-colors',
+                      'rounded-lg border p-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                       project.coverTheme === th.id
                         ? 'border-primary ring-primary/20 ring-2'
                         : 'border-border hover:border-foreground/30'
@@ -317,11 +422,51 @@ export default function StudioProjectDetailPage() {
               </div>
             )}
 
-            {isReady && (
+            {!isWorking && latestJob?.status === 'failed' && (
+              <div className="space-y-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs text-rose-900 dark:text-rose-200">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <ShieldAlert className="size-4 shrink-0" />
+                  {t('failed_refund_title')}
+                </div>
+                <p className="text-[11px] leading-relaxed opacity-90">
+                  {latestJob.error || t('failed_refund_desc')}
+                </p>
+              </div>
+            )}
+
+            {hasDeliverables && isSnapshotStale && !isWorking && (
+              <div className="space-y-2.5 rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-900 dark:text-amber-200">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  {t('snapshot_stale_title')}
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  {t('snapshot_stale_desc')}
+                </p>
+                {hasFullManuscript && credits >= 10 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleQuickRecompile}
+                    disabled={recompiling || compiling}
+                    className="gap-1.5"
+                  >
+                    {recompiling ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-3.5" />
+                    )}
+                    {t('btn_quick_recompile')}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {hasDeliverables && (
               <div
                 className={cn(
                   'space-y-3 rounded-xl border p-4 text-xs',
-                  project.guardPassed
+                  exportedGuardPassed
                     ? 'border-emerald-500/40 bg-emerald-500/10'
                     : 'border-amber-500/50 bg-amber-500/10'
                 )}
@@ -329,43 +474,44 @@ export default function StudioProjectDetailPage() {
                 <div
                   className={cn(
                     'flex items-center justify-between font-semibold',
-                    project.guardPassed
+                    exportedGuardPassed
                       ? 'text-emerald-700 dark:text-emerald-300'
                       : 'text-amber-800 dark:text-amber-300'
                   )}
                 >
                   <span className="flex items-center gap-1.5">
-                    {project.guardPassed ? (
+                    {exportedGuardPassed ? (
                       <ShieldCheck className="size-4" />
                     ) : (
                       <ShieldAlert className="size-4" />
                     )}
-                    {project.guardPassed
-                      ? `26-Rule Pre-Flight Guard Passed (${project.guardScore}/100)`
-                      : `Compiled with Guard Alerts (${project.guardScore}/100) — Review Before Upload`}
+                    {exportedGuardPassed
+                      ? `26-Rule Pre-Flight Guard Passed (${exportedGuardScore}/100)`
+                      : `Compiled with Guard Alerts (${exportedGuardScore}/100) — Review Before Upload`}
                   </span>
-                  <span>{project.actualWordCount.toLocaleString()} words</span>
+                  <span>{exportedWordCount.toLocaleString()} words</span>
                 </div>
                 <p className="text-muted-foreground text-[11px] leading-relaxed">
-                  Deliverables ready: EPUB 3 + {project.trimSize}&quot; Print
-                  PDF (<strong>{displayPages} actual pages</strong>, Spine{' '}
-                  <strong>{spineIn}&quot;</strong>, Full Wrap{' '}
+                  Exported snapshot: <strong>{exportedTitle}</strong> (
+                  {exportedCoverTheme}) · EPUB 3 + {exportedTrimSize}&quot;
+                  Print PDF (<strong>{exportedPages} actual pages</strong>,
+                  Spine <strong>{exportedSpineIn}&quot;</strong>, Full Wrap{' '}
                   <strong>
-                    {wrapW}&quot;×{wrapH}&quot;
+                    {exportedWrapW}&quot;×{exportedWrapH}&quot;
                   </strong>
                   ). Open EPUB in Amazon Kindle Previewer and inspect Print PDF
                   &amp; Cover Wrap in KDP Print Previewer before publishing.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <a
-                    href={`/api/kdp/projects/${project.id}/download?type=bundle`}
+                    href={`/api/kdp/projects/${project.id}/download?type=bundle&v=${bundleCacheTag}`}
                     className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5')}
                   >
                     <Download className="size-3.5" />
                     {t('btn_download_zip')}
                   </a>
                   <a
-                    href={`/api/kdp/projects/${project.id}/download?type=epub`}
+                    href={`/api/kdp/projects/${project.id}/download?type=epub&v=${bundleCacheTag}`}
                     className={cn(
                       buttonVariants({ variant: 'outline', size: 'sm' })
                     )}
@@ -373,7 +519,7 @@ export default function StudioProjectDetailPage() {
                     EPUB 3
                   </a>
                   <a
-                    href={`/api/kdp/projects/${project.id}/download?type=interior`}
+                    href={`/api/kdp/projects/${project.id}/download?type=interior&v=${bundleCacheTag}`}
                     className={cn(
                       buttonVariants({ variant: 'outline', size: 'sm' })
                     )}
@@ -381,7 +527,7 @@ export default function StudioProjectDetailPage() {
                     Interior PDF
                   </a>
                   <a
-                    href={`/api/kdp/projects/${project.id}/download?type=cover_wrap`}
+                    href={`/api/kdp/projects/${project.id}/download?type=cover_wrap&v=${bundleCacheTag}`}
                     className={cn(
                       buttonVariants({ variant: 'outline', size: 'sm' })
                     )}
@@ -408,11 +554,29 @@ export default function StudioProjectDetailPage() {
                 {t('btn_preview_ch1')}
               </Button>
 
+              {hasFullManuscript && credits >= 10 && (
+                <Button
+                  type="button"
+                  variant={isSnapshotStale ? 'default' : 'outline'}
+                  onClick={handleQuickRecompile}
+                  disabled={recompiling || compiling || isWorking}
+                  className="gap-1.5"
+                >
+                  {recompiling ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                  {t('btn_quick_recompile')}
+                </Button>
+              )}
+
               {credits >= 100 || isReady ? (
                 <Button
                   type="button"
+                  variant={hasFullManuscript ? 'outline' : 'default'}
                   onClick={handleCompileFullBook}
-                  disabled={compiling || isWorking}
+                  disabled={compiling || recompiling || isWorking}
                   className="gap-1.5"
                 >
                   {compiling ? (
@@ -476,7 +640,9 @@ export default function StudioProjectDetailPage() {
           <CardContent>
             <div
               className="prose prose-sm dark:prose-invert max-w-none leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: previewChapter.contentHtml }}
+              dangerouslySetInnerHTML={{
+                __html: sanitizeChapterHtml(previewChapter.contentHtml),
+              }}
             />
           </CardContent>
         </Card>

@@ -3,6 +3,7 @@
  * 由 schema.postgres.ts 重新导出，供 Drizzle ORM 与 Worker 协同使用。
  */
 
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -10,6 +11,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 // ─── 1. 作者笔名与多账户防关联隔离档案 ──────────────────────────────────────
@@ -74,6 +76,9 @@ export const kdpProject = pgTable(
     coverWrapPdfKey: text('cover_wrap_pdf_key').notNull().default(''),
     coverFrontJpgKey: text('cover_front_jpg_key').notNull().default(''),
     bundleZipKey: text('bundle_zip_key').notNull().default(''),
+    compiledSnapshotJson: text('compiled_snapshot_json')
+      .notNull()
+      .default('{}'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -146,6 +151,11 @@ export const kdpJob = pgTable(
     index('idx_kdp_job_queue').on(t.status, t.createdAt),
     index('idx_kdp_job_project').on(t.projectId, t.createdAt),
     index('idx_kdp_job_user').on(t.userId, t.createdAt),
+    uniqueIndex('uidx_kdp_job_active_project')
+      .on(t.projectId)
+      .where(
+        sql`status IN ('queued', 'processing') AND project_id IS NOT NULL`
+      ),
   ]
 );
 

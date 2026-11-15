@@ -31,7 +31,12 @@
     "tier_risk_advisory": "经验风险提示",
     "top_fixes_title": "优先修复前 3 处关键问题",
     "manual_checks_title": "以下检查仍需您人工确认",
-    "clean_text_title": "洗稿脱敏后的合规正文"
+    "clean_text_title": "洗稿脱敏后的合规正文",
+    "auth_gate_title": "免费注册即可领 30 新手积分执行 AI 合规洗稿",
+    "auth_gate_desc": "您当前扫描的草稿已暂存本地。免费注册或登录后将自动跳回本页：30 新手积分可直接支付 1 次 AI 洗稿（15 积分）+ 1 次防撞车立项大纲（10 积分）。",
+    "btn_signup_sanitize": "免费注册领 30 分并继续洗稿",
+    "btn_signin_sanitize": "已有账号，登录返回",
+    "btn_open_studio_prefill": "带当前选题进入 Studio 重写合规全书"
   },
   "studio": {
     "title": "PublishGuard 造书工作台",
@@ -45,10 +50,18 @@
     "step3_title": "Step 3：一键编译全书双轨文件包（100 积分）与 KDP 填表清单",
     "btn_create_outline": "生成合规书名与 12 节大纲（10 积分）",
     "btn_preview_ch1": "免费生成第 1 章完整试读",
+    "btn_quick_recompile": "10 积分快速重打包封面与新书名（零 LLM 耗时）",
     "btn_generate_all": "编译全书 EPUB + 6×9 印刷 PDF 全套包（100 积分）",
     "btn_download_zip": "下载完整交付包 KDP_Ready_Bundle.zip",
     "btn_copy": "复制",
-    "copied": "已复制到剪贴板"
+    "copied": "已复制到剪贴板",
+    "snapshot_stale_title": "检测到配置已修改，当前下载包仍为上一版快照",
+    "snapshot_stale_desc": "您在上次导出后更改了书名、封面皮肤或版面规格。只需消耗 10 积分执行一次快速重打包（无需重新生成正文），即可同步更新下载文件、封面书脊与 Guard 评分。",
+    "failed_refund_title": "最近一次构建未成功 — 已全额自动退还本次消耗积分",
+    "failed_refund_desc": "系统已自动退回本次扣除的积分；若下方存在此前编译成功的交付包，您仍可正常下载。",
+    "toast_theme_updated": "封面架构样式已更新",
+    "toast_title_updated": "主书名已更新",
+    "toast_recompile_enqueued": "快速重打包任务已入队，正在实时同步新规格..."
   },
   "profiles": {
     "title": "笔名品牌与发布节奏管理",

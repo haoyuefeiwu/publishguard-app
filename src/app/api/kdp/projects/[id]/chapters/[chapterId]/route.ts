@@ -3,7 +3,8 @@ import { and, eq } from 'drizzle-orm';
 
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
-import { kdpChapter } from '@/config/db/schema';
+import { kdpChapter, kdpProject } from '@/config/db/schema';
+import { sanitizeChapterHtml } from '@/lib/html-sanitizer';
 import { respData, respErr } from '@/lib/resp';
 
 export async function PATCH(
@@ -16,14 +17,33 @@ export async function PATCH(
     if (!session?.user) return respErr('Unauthorized');
 
     const { id: projectId, chapterId } = await context.params;
+
+    const [proj] = await db()
+      .select({ status: kdpProject.status })
+      .from(kdpProject)
+      .where(
+        and(
+          eq(kdpProject.id, projectId),
+          eq(kdpProject.userId, session.user.id)
+        )
+      )
+      .limit(1);
+    if (!proj) return respErr('Project not found');
+    if (proj.status === 'queued' || proj.status === 'generating') {
+      return respErr(
+        'Cannot edit chapters while project generation is in progress'
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
 
     const patch: Record<string, any> = { updatedAt: new Date() };
     if (typeof body.title === 'string') patch.title = body.title.trim();
     if (typeof body.summary === 'string') patch.summary = body.summary.trim();
     if (typeof body.content_html === 'string') {
-      patch.contentHtml = body.content_html;
-      const plain = body.content_html.replace(/<[^>]+>/g, ' ').trim();
+      const safeHtml = sanitizeChapterHtml(body.content_html);
+      patch.contentHtml = safeHtml;
+      const plain = safeHtml.replace(/<[^>]+>/g, ' ').trim();
       patch.wordCount = plain ? plain.split(/\s+/).length : 0;
     }
 

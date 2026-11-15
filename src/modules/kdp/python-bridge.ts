@@ -136,6 +136,13 @@ export interface GuardAuditResponse {
   };
   suggestions: Array<{ original: string; replacement: string }>;
   checks_not_run?: Array<{ code: string; title: string; reason: string }>;
+  extracted_meta?: {
+    title?: string;
+    subtitle?: string;
+    author_name?: string;
+    language?: string;
+  };
+  extracted_excerpt?: string;
 }
 
 /**
@@ -170,16 +177,19 @@ export async function executeKdpGuardAudit(params: {
  */
 async function getResolvedLlmRouting() {
   const configs = await getAllConfigs();
+  const outlineModel =
+    configs.kdp_outline_model ||
+    process.env.KDP_OUTLINE_MODEL ||
+    'google/gemini-2.5-flash';
   return {
     api_key: configs.openrouter_api_key || process.env.OPENROUTER_API_KEY || '',
     base_url:
       configs.openrouter_base_url ||
       process.env.OPENROUTER_BASE_URL ||
       'https://openrouter.ai/api/v1',
-    outline_model:
-      configs.kdp_outline_model ||
-      process.env.KDP_OUTLINE_MODEL ||
-      'google/gemini-2.5-flash',
+    outline_model: outlineModel,
+    // 0 积分第 1 章试读优先走轻量试读/大纲模型，避免免费羊毛消耗高价全书长文本模型额度
+    preview_model: configs.kdp_preview_model || outlineModel,
     writer_model:
       configs.kdp_writer_model ||
       process.env.KDP_WRITER_MODEL ||
@@ -188,6 +198,7 @@ async function getResolvedLlmRouting() {
       configs.kdp_sanitizer_model ||
       process.env.KDP_SANITIZER_MODEL ||
       'google/gemini-2.5-flash',
+    strict: process.env.KDP_ALLOW_DEMO_TEMPLATE !== '1',
   };
 }
 
@@ -222,6 +233,7 @@ export async function generateBookOutlineViaPython(params: {
       api_key: llm.api_key,
       base_url: llm.base_url,
       model: llm.outline_model,
+      strict: llm.strict,
     },
     90_000
   );
@@ -245,7 +257,8 @@ export async function generateChapterPreviewViaPython(params: {
       ...params,
       api_key: llm.api_key,
       base_url: llm.base_url,
-      model: llm.writer_model,
+      model: llm.preview_model,
+      strict: llm.strict,
     },
     120_000
   );
@@ -264,6 +277,7 @@ export async function autoSanitizeViaPython(params: {
       api_key: llm.api_key,
       base_url: llm.base_url,
       model: llm.sanitizer_model,
+      strict: llm.strict,
     },
     60_000
   );

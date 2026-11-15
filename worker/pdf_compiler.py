@@ -67,12 +67,18 @@ def _chromium_subprocess_env(profile_dir: str) -> dict[str, str]:
 
 
 def _chromium_common_flags(profile_dir: str) -> list[str]:
+    # 阻断渲染进程内任何外网解析与回连，防止章节 HTML 注入或 SSRF 探针探测内网/外网
     flags = [
         "--headless=new",
         "--no-sandbox",
         "--disable-setuid-sandbox",
         f"--user-data-dir={profile_dir}",
         "--disable-gpu",
+        "--proxy-server=http://127.0.0.1:1",
+        "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--no-pings",
     ]
     if sys.platform != "darwin":
         flags.append("--disable-dev-shm-usage")
@@ -85,7 +91,7 @@ def render_html_to_pdf(html_path: Path, pdf_path: Path, timeout_sec: int = 25) -
     if pdf_path.exists():
         pdf_path.unlink()
 
-    last_err: Exception | None = None
+    last_err = ""
     for _ in range(3):
         with tempfile.TemporaryDirectory() as tmp_profile:
             cmd = [
@@ -99,50 +105,63 @@ def render_html_to_pdf(html_path: Path, pdf_path: Path, timeout_sec: int = 25) -
                 f"file://{html_path.resolve()}",
             ]
             try:
-                subprocess.run(
+                res = subprocess.run(
                     cmd,
-                    check=True,
+                    check=False,
                     timeout=timeout_sec,
                     env=_chromium_subprocess_env(tmp_profile),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
-                if pdf_path.exists() and pdf_path.stat().st_size > 800:
+                if res.returncode == 0 and pdf_path.exists() and pdf_path.stat().st_size > 800:
                     return
+                stderr_tail = (res.stderr or b"").decode("utf-8", errors="ignore")[-400:].strip()
+                last_err = f"rc={res.returncode}, stderr={stderr_tail or 'empty'}"
             except Exception as exc:
-                last_err = exc
+                last_err = str(exc)
     raise RuntimeError(f"Chrome Headless 导出 PDF 失败: {last_err}")
 
 
 def render_cover_front_jpg(html_path: Path, jpg_path: Path, timeout_sec: int = 25) -> None:
-    """渲染 1600×2560 高清电子书正面封面图。"""
+    """渲染 1600×2560 高清电子书正面封面图（带 3 次重试与网络隔离）。"""
     chrome_bin = resolve_chrome_binary()
     png_path = jpg_path.with_suffix(".png")
-    with tempfile.TemporaryDirectory() as tmp_profile:
-        cmd = [
-            chrome_bin,
-            *_chromium_common_flags(tmp_profile),
-            "--hide-scrollbars",
-            "--window-size=1600,2560",
-            "--force-device-scale-factor=1",
-            f"--screenshot={png_path}",
-            f"file://{html_path.resolve()}",
-        ]
-        subprocess.run(
-            cmd,
-            check=True,
-            timeout=timeout_sec,
-            env=_chromium_subprocess_env(tmp_profile),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+    last_err = ""
+    for _ in range(3):
+        if png_path.exists():
+            png_path.unlink()
+        with tempfile.TemporaryDirectory() as tmp_profile:
+            cmd = [
+                chrome_bin,
+                *_chromium_common_flags(tmp_profile),
+                "--hide-scrollbars",
+                "--window-size=1600,2560",
+                "--force-device-scale-factor=1",
+                f"--screenshot={png_path}",
+                f"file://{html_path.resolve()}",
+            ]
+            try:
+                res = subprocess.run(
+                    cmd,
+                    check=False,
+                    timeout=timeout_sec,
+                    env=_chromium_subprocess_env(tmp_profile),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                if res.returncode == 0 and png_path.exists() and png_path.stat().st_size > 800:
+                    from PIL import Image
 
-    from PIL import Image
-
-    with Image.open(png_path) as img:
-        img.convert("RGB").save(str(jpg_path), format="JPEG", quality=95)
-    if png_path.exists():
-        png_path.unlink()
+                    with Image.open(png_path) as img:
+                        img.convert("RGB").save(str(jpg_path), format="JPEG", quality=95)
+                    if png_path.exists():
+                        png_path.unlink()
+                    return
+                stderr_tail = (res.stderr or b"").decode("utf-8", errors="ignore")[-400:].strip()
+                last_err = f"rc={res.returncode}, stderr={stderr_tail or 'empty'}"
+            except Exception as exc:
+                last_err = str(exc)
+    raise RuntimeError(f"Chrome Headless 渲染正面封面失败: {last_err}")
 
 
 def build_paperback_interior_html(
@@ -524,6 +543,7 @@ def compile_paperback_and_bundle(
     return {
         "actual_pages": str(actual_pages),
         "spine_width_in": str(wrap_dims.spine_width),
+        "wrap_dimensions_in": f"{wrap_dims.total_width} x {wrap_dims.total_height}",
         "interior_pdf": interior_pdf_path.name,
         "cover_wrap_pdf": wrap_pdf_path.name,
         "cover_front_jpg": front_jpg_path.name,

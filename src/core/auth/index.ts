@@ -282,6 +282,7 @@ export function getAuth(configs?: Record<string, string>) {
                 userId: createdUser.id,
                 userEmail: createdUser.email,
                 configs: all,
+                clientIp: createdUser.ip,
               });
             } catch (error) {
               console.error('[auth] grant signup credits failed', error);

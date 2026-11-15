@@ -17,11 +17,16 @@ from typing import Any
 
 import httpx
 
+from html_sanitizer import sanitize_chapter_html
 from kdp_guard_service import (
     VALID_KDP_PRIMARY_CATEGORIES,
     count_words,
     quick_dictionary_sanitize,
 )
+
+
+class MissingApiKeyError(RuntimeError):
+    """付费任务缺少可用 LLM API 密钥，拒绝静默回退到演示样稿模板。"""
 
 # 注入到所有长文撰写 System Prompt 中的铁律负面清单
 COMPLIANCE_SYSTEM_CONSTRAINTS = """
@@ -87,6 +92,30 @@ def _extract_json_object(raw: str) -> dict[str, Any]:
     raise ValueError("Model output did not parse to a JSON object")
 
 
+def _resolve_fallback_credentials(
+    fallback_api_key: str = "",
+    fallback_base_url: str = "",
+    fallback_model: str = "",
+) -> tuple[str, str, str]:
+    key = (
+        fallback_api_key
+        or os.environ.get("FALLBACK_API_KEY")
+        or os.environ.get("DEEPSEEK_API_KEY")
+        or ""
+    ).strip()
+    base = (
+        fallback_base_url
+        or os.environ.get("FALLBACK_BASE_URL")
+        or "https://api.deepseek.com/v1"
+    ).strip()
+    mdl = (
+        fallback_model
+        or os.environ.get("FALLBACK_MODEL")
+        or "deepseek-chat"
+    ).strip()
+    return key, base, mdl
+
+
 def call_openrouter_chat(
     *,
     messages: list[dict[str, str]],
@@ -96,8 +125,11 @@ def call_openrouter_chat(
     temperature: float = 0.7,
     max_tokens: int = 4096,
     json_mode: bool = False,
+    fallback_api_key: str = "",
+    fallback_base_url: str = "",
+    fallback_model: str = "",
 ) -> str:
-    """调用主网关（默认 Gemini / OpenRouter），失败（没额度/限流/超时/JSON 截断）时自动切换到 DeepSeek 兜底。"""
+    """调用主网关（默认 Gemini / OpenRouter），失败（没额度/限流/超时/JSON 截断）或主密钥为空时切换 DeepSeek 兜底。"""
     def _invoke_and_validate(use_model: str, use_key: str, use_base: str) -> str:
         text = _post_chat_completions(
             messages=messages,
@@ -113,19 +145,27 @@ def call_openrouter_chat(
             _extract_json_object(text)
         return text
 
+    fb_key, fb_base, fb_model = _resolve_fallback_credentials(
+        fallback_api_key, fallback_base_url, fallback_model
+    )
+    clean_primary = (api_key or "").strip()
+    if not clean_primary:
+        if not fb_key:
+            raise MissingApiKeyError(
+                "LLM API key is missing; configure OPENROUTER_API_KEY or FALLBACK_API_KEY."
+            )
+        return _invoke_and_validate(fb_model, fb_key, fb_base)
+
     try:
-        return _invoke_and_validate(model, api_key, base_url)
+        return _invoke_and_validate(model, clean_primary, base_url)
     except Exception as primary_err:
-        fallback_key = os.environ.get("FALLBACK_API_KEY") or os.environ.get("DEEPSEEK_API_KEY", "")
-        if not fallback_key or fallback_key == api_key:
+        if not fb_key or fb_key == clean_primary:
             raise
-        fallback_base = os.environ.get("FALLBACK_BASE_URL", "https://api.deepseek.com/v1")
-        fallback_model = os.environ.get("FALLBACK_MODEL", "deepseek-chat")
         print(
-            f"[book_writer] 主模型 {model} 调用失败 ({type(primary_err).__name__}: {primary_err})，自动切换兜底模型 {fallback_model}",
+            f"[book_writer] 主模型 {model} 调用失败 ({type(primary_err).__name__}: {primary_err})，自动切换兜底模型 {fb_model}",
             file=sys.stderr,
         )
-        return _invoke_and_validate(fallback_model, fallback_key, fallback_base)
+        return _invoke_and_validate(fb_model, fb_key, fb_base)
 
 
 def _fallback_outline_payload(topic: str, audience: str, genre: str, companion_product: str) -> dict[str, Any]:
@@ -180,9 +220,20 @@ def generate_outline_and_metadata(
     api_key: str = "",
     base_url: str = "https://openrouter.ai/api/v1",
     model: str = "google/gemini-2.5-flash",
+    strict: bool = False,
+    fallback_api_key: str = "",
+    fallback_base_url: str = "",
+    fallback_model: str = "",
 ) -> dict[str, Any]:
     """生成 3 个防撞车书名、去公式化副标题、7 个后端关键词与 12 节深度专著大纲。"""
-    if not api_key.strip():
+    fb_key, fb_base, fb_model = _resolve_fallback_credentials(
+        fallback_api_key, fallback_base_url, fallback_model
+    )
+    if not api_key.strip() and not fb_key:
+        if strict and os.environ.get("KDP_ALLOW_DEMO_TEMPLATE") != "1":
+            raise MissingApiKeyError(
+                "LLM API key is not configured for outline generation."
+            )
         return _fallback_outline_payload(topic, audience, genre, companion_product)
 
     cats = ", ".join(sorted(VALID_KDP_PRIMARY_CATEGORIES))
@@ -218,6 +269,9 @@ Return valid JSON only.
         temperature=0.65,
         max_tokens=6500,
         json_mode=True,
+        fallback_api_key=fb_key,
+        fallback_base_url=fb_base,
+        fallback_model=fb_model,
     )
     data = _extract_json_object(raw)
     if data.get("primary_category") not in VALID_KDP_PRIMARY_CATEGORIES:
@@ -264,10 +318,23 @@ def generate_chapter_html(
     api_key: str = "",
     base_url: str = "https://openrouter.ai/api/v1",
     model: str = "anthropic/claude-sonnet-4",
+    strict: bool = False,
+    fallback_api_key: str = "",
+    fallback_base_url: str = "",
+    fallback_model: str = "",
 ) -> str:
-    """带前文滚动记忆的深度章节生成器，保证每章 ≥1,450 词且零 KDP 违禁词。"""
-    if not api_key.strip():
-        return _fallback_chapter_html(chapter_title, chapter_summary, min_words=target_words)
+    """带前文滚动记忆的深度章节生成器，保证每章 ≥1,450 词、零 KDP 违禁词且经白名单安全净化。"""
+    fb_key, fb_base, fb_model = _resolve_fallback_credentials(
+        fallback_api_key, fallback_base_url, fallback_model
+    )
+    if not api_key.strip() and not fb_key:
+        if strict and os.environ.get("KDP_ALLOW_DEMO_TEMPLATE") != "1":
+            raise MissingApiKeyError(
+                "LLM API key is not configured for chapter generation."
+            )
+        return sanitize_chapter_html(
+            _fallback_chapter_html(chapter_title, chapter_summary, min_words=target_words)
+        )
 
     memory_ctx = "\n".join(f"- {s}" for s in prev_summaries[-4:]) or "Opening section of the monograph."
     prompt = f"""
@@ -301,11 +368,14 @@ Include:
         base_url=base_url,
         temperature=0.72,
         max_tokens=7000,
+        fallback_api_key=fb_key,
+        fallback_base_url=fb_base,
+        fallback_model=fb_model,
     )
-    # 剥离模型偶尔附带的 markdown ```html 包裹，并二次走确定性字典过滤确保 100% 安全
+    # 剥离 markdown 包裹、执行违禁词过滤与 HTML 白名单安全净化
     html_out = re.sub(r"^```(?:html)?\s*", "", html_out, flags=re.IGNORECASE)
     html_out = re.sub(r"\s*```$", "", html_out)
-    html_out = quick_dictionary_sanitize(html_out).strip()
+    html_out = sanitize_chapter_html(quick_dictionary_sanitize(html_out)).strip()
 
     # 若单章字数低于安全底线，自动续写 1 轮深化案例与实操细节，防止全书不足 15,000 词触发 Thin Content
     min_chapter_words = max(1350, int(target_words * 0.85))
@@ -330,14 +400,19 @@ Existing Chapter Ending:
                 base_url=base_url,
                 temperature=0.7,
                 max_tokens=2200,
+                fallback_api_key=fb_key,
+                fallback_base_url=fb_base,
+                fallback_model=fb_model,
             )
             ext_out = re.sub(r"^```(?:html)?\s*", "", ext_out, flags=re.IGNORECASE)
             ext_out = re.sub(r"\s*```$", "", ext_out)
-            html_out = f"{html_out}\n{quick_dictionary_sanitize(ext_out).strip()}"
+            ext_clean = sanitize_chapter_html(quick_dictionary_sanitize(ext_out)).strip()
+            if ext_clean:
+                html_out = f"{html_out}\n{ext_clean}"
         except Exception:
             pass
 
-    return html_out.strip()
+    return sanitize_chapter_html(html_out).strip()
 
 
 def auto_sanitize_with_ai(
@@ -347,11 +422,25 @@ def auto_sanitize_with_ai(
     api_key: str = "",
     base_url: str = "https://openrouter.ai/api/v1",
     model: str = "google/gemini-2.5-flash",
+    strict: bool = False,
+    fallback_api_key: str = "",
+    fallback_base_url: str = "",
+    fallback_model: str = "",
 ) -> str:
     """利用 Flash 模型针对 26 项审计标红点执行无损原地合规洗稿。"""
     # 先执行确定性安全字典替换与超链接清理
     pre_cleaned = quick_dictionary_sanitize(raw_text)
-    if not api_key.strip() or not findings:
+    if not findings:
+        return pre_cleaned
+
+    fb_key, fb_base, fb_model = _resolve_fallback_credentials(
+        fallback_api_key, fallback_base_url, fallback_model
+    )
+    if not api_key.strip() and not fb_key:
+        if strict and os.environ.get("KDP_ALLOW_DEMO_TEMPLATE") != "1":
+            raise MissingApiKeyError(
+                "LLM API key is not configured for AI Compliance Sanitizer."
+            )
         return pre_cleaned
 
     finding_lines = "\n".join(
@@ -378,6 +467,9 @@ Original Text:
         base_url=base_url,
         temperature=0.3,
         max_tokens=7000,
+        fallback_api_key=fb_key,
+        fallback_base_url=fb_base,
+        fallback_model=fb_model,
     )
     return quick_dictionary_sanitize(rewritten).strip()
 
@@ -389,6 +481,7 @@ def main() -> int:
     args = parser.parse_args()
 
     payload = json.loads(sys.stdin.read() or "{}")
+    strict_mode = bool(payload.get("strict", False))
     if args.action == "outline":
         res = generate_outline_and_metadata(
             topic=payload.get("topic", ""),
@@ -400,6 +493,7 @@ def main() -> int:
             api_key=payload.get("api_key", os.environ.get("OPENROUTER_API_KEY", "")),
             base_url=payload.get("base_url", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")),
             model=payload.get("model", os.environ.get("KDP_OUTLINE_MODEL", "google/gemini-2.5-flash")),
+            strict=strict_mode,
         )
         print(json.dumps(res, ensure_ascii=False))
         return 0
@@ -417,6 +511,7 @@ def main() -> int:
             api_key=payload.get("api_key", os.environ.get("OPENROUTER_API_KEY", "")),
             base_url=payload.get("base_url", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")),
             model=payload.get("model", os.environ.get("KDP_WRITER_MODEL", "anthropic/claude-sonnet-4")),
+            strict=strict_mode,
         )
         print(json.dumps({"content_html": html_out}, ensure_ascii=False))
         return 0
@@ -427,6 +522,7 @@ def main() -> int:
         api_key=payload.get("api_key", os.environ.get("OPENROUTER_API_KEY", "")),
         base_url=payload.get("base_url", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")),
         model=payload.get("model", os.environ.get("KDP_SANITIZER_MODEL", "google/gemini-2.5-flash")),
+        strict=strict_mode,
     )
     print(json.dumps({"sanitized_text": sanitized}, ensure_ascii=False))
     return 0

@@ -319,3 +319,152 @@ def test_prepare_chapter_body_deduplicates_leading_heading() -> None:
     assert normalized.count("<h1") == 1
     assert "<h2" not in normalized
     assert format_plain_domain("https://getpublishguard.com/sample-companion/") == "getpublishguard.com/sample-companion"
+
+
+def test_epub_rejects_broken_container_opf_spine_and_compressed_mimetype() -> None:
+    """损坏或篡改 container.xml/OPF/spine 引用链以及压缩 mimetype 的伪造 EPUB 必须被拦截。"""
+    import io
+
+    # 1) mimetype 使用 ZIP_DEFLATED 且缺失 container.xml，另塞入孤立 XHTML 与非法文本 OPF
+    buf1 = io.BytesIO()
+    with zipfile.ZipFile(buf1, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr("OEBPS/content.opf", "NOT_VALID_XML_TEXT")
+        zf.writestr("OEBPS/rogue.xhtml", "<html><body><p>" + " ".join(["word"] * 2000) + "</p></body></html>")
+    res1 = audit_epub_bytes(buf1.getvalue(), check_live_collisions=False)
+    assert res1.passed is False
+    codes1 = {e["code"]: e for e in res1.errors}
+    assert "EPUB_MIMETYPE_COMPRESSED" in codes1
+    assert codes1["EPUB_MIMETYPE_COMPRESSED"]["severity"] == "error"
+    assert "EPUB_MISSING_CONTAINER_XML" in codes1
+
+    # 2) container.xml 与 OPF 存在，但 OPF 中含 XXE <!ENTITY> 且 spine 引用不存在 idref
+    buf2 = io.BytesIO()
+    with zipfile.ZipFile(buf2, "w", compression=zipfile.ZIP_STORED) as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr(
+            "META-INF/container.xml",
+            '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+            '<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+        )
+        zf.writestr(
+            "OEBPS/content.opf",
+            '<?xml version="1.0"?><!DOCTYPE package [<!ENTITY xxe "bad">]><package><metadata/><manifest>'
+            '<item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/></manifest>'
+            '<spine><itemref idref="missing"/></spine></package>',
+        )
+        zf.writestr("OEBPS/ch1.xhtml", "<html><body><p>Clean prose here.</p></body></html>")
+    res2 = audit_epub_bytes(buf2.getvalue(), check_live_collisions=False)
+    assert res2.passed is False
+    assert "EPUB_INVALID_OPF_XML" in {e["code"] for e in res2.errors}
+
+    # 3) 合法 XML 但 spine 指向缺失清单项
+    buf3 = io.BytesIO()
+    with zipfile.ZipFile(buf3, "w", compression=zipfile.ZIP_STORED) as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr(
+            "META-INF/container.xml",
+            '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+            '<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+        )
+        zf.writestr(
+            "OEBPS/content.opf",
+            '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0">'
+            '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Broken Spine</dc:title><dc:creator>Evelyn Vance</dc:creator></metadata>'
+            '<manifest><item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/></manifest>'
+            '<spine><itemref idref="ghost_item"/></spine></package>',
+        )
+        zf.writestr("OEBPS/ch1.xhtml", "<html><body><p>Clean prose here.</p></body></html>")
+    res3 = audit_epub_bytes(buf3.getvalue(), check_live_collisions=False)
+    assert res3.passed is False
+    codes3 = {e["code"] for e in res3.errors}
+    assert "EPUB_BROKEN_SPINE_REF" in codes3
+
+
+def test_epub_enforces_size_entry_and_zip_bomb_limits() -> None:
+    """超限 EPUB（>15MB、>2000 条目、伪造解压头或高膨胀 ZIP 炸弹）必须被立即拒绝。"""
+    import io
+
+    # 1) 超过 15MB 原文件上限
+    oversized = b"PK\x03\x04" + b"\x00" * (15 * 1024 * 1024 + 10)
+    res_big = audit_epub_bytes(oversized, check_live_collisions=False)
+    assert res_big.passed is False
+    assert {e["code"] for e in res_big.errors} == {"EPUB_TOO_LARGE"}
+
+    # 2) 超过 2000 个条目上限
+    buf_many = io.BytesIO()
+    with zipfile.ZipFile(buf_many, "w", compression=zipfile.ZIP_STORED) as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        for idx in range(2005):
+            zf.writestr(f"OEBPS/f_{idx}.txt", "a")
+    res_many = audit_epub_bytes(buf_many.getvalue(), check_live_collisions=False)
+    assert res_many.passed is False
+    assert {e["code"] for e in res_many.errors} == {"EPUB_TOO_MANY_ENTRIES"}
+
+
+def test_epub_extracts_meta_and_excerpt_from_valid_archive(tmp_path: Path) -> None:
+    """合法 EPUB 审计应自动提取 extracted_meta 与 spine 正文摘录以打通闭环净化。"""
+    sample_body = "<p>" + " ".join(["grounded", "clarity", "presence", "focus", "steadiness"] * 350) + "</p>"
+    epub_path = tmp_path / "meta_extract.epub"
+    compile_epub(
+        output_epub_path=epub_path,
+        title="The Quiet Cadence",
+        subtitle="Composed Work Habits For Modern Creative Focus And Long Term Clarity",
+        author_name="Evelyn Vance",
+        language="en",
+        chapters=[
+            {
+                "title": f"Chapter {i + 1}: Stillness",
+                "slug": f"ch-{i + 1}",
+                "content_html": f"<h2>Chapter {i + 1}: Stillness</h2>{sample_body}",
+                "section_type": "chapter",
+            }
+            for i in range(9)
+        ],
+    )
+    res = audit_epub_bytes(epub_path.read_bytes(), check_live_collisions=False)
+    assert res.passed is True, f"合法 EPUB 不应失败: {res.errors}"
+    assert "The Quiet Cadence" in res.extracted_meta.get("title", "")
+    assert res.extracted_meta.get("author_name") == "Evelyn Vance"
+    assert "grounded clarity" in res.extracted_excerpt.lower()
+
+
+def test_html_sanitizer_and_chrome_network_isolation(tmp_path: Path) -> None:
+    """白名单 HTML 净化器必须剥离脚本与事件属性，Chrome Headless 必须启用离线网络隔离参数。"""
+    from html_sanitizer import sanitize_chapter_html
+    from pdf_compiler import _chromium_common_flags
+
+    dirty = (
+        '<h2 onclick="steal()">Chapter One</h2>'
+        '<script>fetch("http://127.0.0.1:9999/exfil")</script>'
+        '<iframe src="https://evil.test/frame"></iframe>'
+        '<svg onload="alert(1)"><circle/></svg>'
+        '<p style="position:fixed" data-x="1">Safe <strong>body</strong> <img src="x" onerror="alert(2)"> '
+        '<a href="javascript:alert(3)">bad link</a> and '
+        '<a href="https://example.com/resource">external link</a>.</p>'
+    )
+    clean = sanitize_chapter_html(dirty)
+    lowered = clean.lower()
+    assert "<script" not in lowered
+    assert "<iframe" not in lowered
+    assert "<svg" not in lowered
+    assert "onclick" not in lowered
+    assert "onerror" not in lowered
+    assert "javascript:" not in lowered
+    assert "style=" not in lowered
+    assert "<a " not in lowered
+    assert "<strong>body</strong>" in clean
+    assert "<h2>Chapter One</h2>" in clean
+    assert "bad link" in clean
+    assert '<span class="url-text">example.com/resource</span>' in clean
+
+    # compile/preview 归一化入口同样强制净化
+    prepared = prepare_chapter_body_html(dirty, "Chapter One")
+    assert "<script" not in prepared.lower()
+    assert "onerror" not in prepared.lower()
+
+    # Chrome Headless 启动参数必须显式阻断非本地网络出网与后台请求
+    flags = _chromium_common_flags(str(tmp_path / "chrome-prof"))
+    assert "--proxy-server=http://127.0.0.1:1" in flags
+    assert "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost" in flags
+    assert "--disable-background-networking" in flags

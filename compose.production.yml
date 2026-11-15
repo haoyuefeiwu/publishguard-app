@@ -68,6 +68,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.worker
     restart: unless-stopped
+    shm_size: '1gb'
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,6 +76,7 @@ services:
       DATABASE_PROVIDER: postgres
       DATABASE_URL: postgresql://publishguard:${POSTGRES_PASSWORD}@postgres:5432/publishguard
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://getpublishguard.com}
+      CONFIG_ENCRYPTION_KEY: ${CONFIG_ENCRYPTION_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
       KDP_OUTLINE_MODEL: ${KDP_OUTLINE_MODEL:-gemini-flash-latest}

@@ -6,6 +6,7 @@ import type { DbConfig } from './types';
 
 const mysqlCompatProxyCache = new WeakMap<object, any>();
 const sqliteCompatProxyCache = new WeakMap<object, any>();
+const sqliteTxTailMap = new WeakMap<object, Promise<void>>();
 
 /**
  * Global fallback for Drizzle `.returning()` on dialects that don't support it (notably MySQL).
@@ -103,7 +104,8 @@ function withMysqlCompat<T extends object>(dbInstance: T): T {
  */
 function withSqliteCompat<T extends object>(
   dbInstance: T,
-  provider?: string
+  provider?: string,
+  isNestedTx = false
 ): T {
   if (dbInstance && typeof dbInstance === 'object') {
     const cached = sqliteCompatProxyCache.get(dbInstance);
@@ -138,12 +140,26 @@ function withSqliteCompat<T extends object>(
         }
         const original = Reflect.get(target, prop, receiver);
         if (typeof original !== 'function') return original;
-        return (fn: any, ...rest: any[]) =>
-          original.call(
-            target,
-            (tx: any) => fn(withSqliteCompat(tx, provider)),
-            ...rest
+        return (fn: any, ...rest: any[]) => {
+          const runTx = () =>
+            original.call(
+              target,
+              (tx: any) => fn(withSqliteCompat(tx, provider, true)),
+              ...rest
+            );
+          if (isNestedTx || provider !== 'sqlite') {
+            return runTx();
+          }
+          // 串行化同进程内的顶层 SQLite 事务，避免 @libsql/client 单连接并发 BEGIN 触发 SQLITE_BUSY
+          const prevTail = sqliteTxTailMap.get(target) ?? Promise.resolve();
+          const resultPromise = prevTail.then(runTx, runTx);
+          const nextTail = resultPromise.then(
+            () => undefined,
+            () => undefined
           );
+          sqliteTxTailMap.set(target, nextTail);
+          return resultPromise;
+        };
       }
 
       const value = Reflect.get(target, prop, receiver);

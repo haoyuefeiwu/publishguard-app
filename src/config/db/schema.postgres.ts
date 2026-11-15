@@ -6,6 +6,7 @@
  * then copy this file's content into schema.ts.
  */
 
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -13,6 +14,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 const table = pgTable;
@@ -224,10 +226,9 @@ export const order = table(
       table.status,
       table.paymentType
     ),
-    index('idx_order_transaction_provider').on(
-      table.transactionId,
-      table.paymentProvider
-    ),
+    uniqueIndex('uidx_order_transaction_provider')
+      .on(table.transactionId, table.paymentProvider)
+      .where(sql`transaction_id IS NOT NULL AND transaction_id <> ''`),
     index('idx_order_created_at').on(table.createdAt),
   ]
 );
@@ -277,7 +278,7 @@ export const subscription = table(
       table.status,
       table.interval
     ),
-    index('idx_subscription_provider_id').on(
+    uniqueIndex('uidx_subscription_provider_id').on(
       table.subscriptionId,
       table.paymentProvider
     ),
@@ -321,6 +322,11 @@ export const credit = table(
     ),
     index('idx_credit_order_no').on(table.orderNo),
     index('idx_credit_subscription_no').on(table.subscriptionNo),
+    uniqueIndex('uidx_credit_order_grant')
+      .on(table.orderNo)
+      .where(
+        sql`transaction_type = 'grant' AND order_no IS NOT NULL AND order_no <> ''`
+      ),
   ]
 );
 

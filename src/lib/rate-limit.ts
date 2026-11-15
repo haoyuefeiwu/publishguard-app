@@ -1,3 +1,4 @@
+import { getClientIpFromCtx } from './cookie';
 import { md5 } from './hash';
 
 type MinIntervalOptions = {
@@ -13,13 +14,7 @@ declare global {
 }
 
 function getClientIpFromRequest(request: Request): string {
-  const xff = request.headers.get('x-forwarded-for');
-  if (xff) return xff.split(',')[0]?.trim() || '';
-  return (
-    request.headers.get('cf-connecting-ip') ||
-    request.headers.get('x-real-ip') ||
-    ''
-  );
+  return getClientIpFromCtx({ headers: request.headers });
 }
 
 function getStore(): Store {

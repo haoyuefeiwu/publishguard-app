@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { headers } from 'next/headers';
 
 import { getAuth } from '@/core/auth';
@@ -68,7 +68,10 @@ export async function GET(
     getArtifactsRoot()
   );
   const fullPath = resolve(/*turbopackIgnore: true*/ rootDir, relKey);
-  if (!fullPath.startsWith(rootDir) || !existsSync(fullPath)) {
+  if (
+    (!fullPath.startsWith(rootDir + sep) && fullPath !== rootDir) ||
+    !existsSync(fullPath)
+  ) {
     return new Response('Asset file missing', { status: 404 });
   }
 
@@ -82,7 +85,7 @@ export async function GET(
       'Content-Disposition': inline
         ? `inline; filename="${spec.filename}"`
         : `attachment; filename="${spec.filename}"`,
-      'Cache-Control': 'private, max-age=300',
+      'Cache-Control': 'private, no-cache, must-revalidate',
     },
   });
 }

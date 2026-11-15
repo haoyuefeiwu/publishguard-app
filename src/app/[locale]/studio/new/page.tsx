@@ -34,6 +34,25 @@ export default function NewBookProjectPage() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const qTopic = (searchParams.get('topic') || '').trim();
+    const qCategory = (searchParams.get('category') || '').trim();
+    const qDomain = (searchParams.get('domain') || '').trim();
+    const qAudience = (searchParams.get('audience') || '').trim();
+
+    if (qTopic) setTopicPrompt(qTopic);
+    if (qDomain) setCompanionUrl(qDomain);
+    if (qAudience) setTargetAudience(qAudience);
+    if (qCategory) {
+      const normalizedCat =
+        qCategory === 'Body, Mind & Spirit' ? 'Self-Help' : qCategory;
+      if (
+        (KDP_PRIMARY_CATEGORIES as readonly string[]).includes(normalizedCat)
+      ) {
+        setGenre(normalizedCat);
+      }
+    }
+
     fetch('/api/kdp/profiles')
       .then((r) => r.json())
       .then((res) => {

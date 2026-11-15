@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, gt, isNull, or, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNull, or, sql, sum } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { envConfigs } from '@/config';
-import { credit } from '@/config/db/schema';
+import { credit, user } from '@/config/db/schema';
 import { getSnowId, getUuid } from '@/lib/hash';
 
 // --- Enums ---
@@ -113,7 +113,7 @@ export async function consume(params: {
   description?: string;
   metadata?: string;
   tx?: any;
-}): Promise<{ success: boolean; consumedCredit?: any }> {
+}): Promise<{ success: boolean; consumedCredit?: any; balance?: number }> {
   const {
     userId,
     userEmail,
@@ -140,11 +140,11 @@ export async function consume(params: {
         )
       );
 
-    if (!balance?.total || parseInt(balance.total) < amount) {
-      return { success: false };
+    if (!balance?.total || parseInt(balance.total, 10) < amount) {
+      return { success: false, balance: parseInt(balance?.total || '0', 10) };
     }
 
-    // 2. FIFO consumption with batching
+    // 2. 按过期时间 FIFO 扣减，并对单条 grant 记录做原子余量防超扣校验
     let remainingToConsume = amount;
     const batchSize = 1000;
     const maxBatches = 10;
@@ -180,23 +180,36 @@ export async function consume(params: {
         if (remainingToConsume <= 0) break;
         const toConsume = Math.min(remainingToConsume, item.remainingCredits);
 
-        await tx
+        const [updatedGrant] = await tx
           .update(credit)
-          .set({ remainingCredits: item.remainingCredits - toConsume })
-          .where(eq(credit.id, item.id));
+          .set({
+            remainingCredits: sql`${credit.remainingCredits} - ${toConsume}`,
+          })
+          .where(
+            and(eq(credit.id, item.id), gte(credit.remainingCredits, toConsume))
+          )
+          .returning();
+
+        if (!updatedGrant) {
+          throw new Error('Concurrent credit balance change detected');
+        }
 
         consumedItems.push({
           creditId: item.id,
           transactionNo: item.transactionNo,
           creditsConsumed: toConsume,
           creditsBefore: item.remainingCredits,
-          creditsAfter: item.remainingCredits - toConsume,
+          creditsAfter: updatedGrant.remainingCredits,
         });
 
         remainingToConsume -= toConsume;
       }
 
       batchNo++;
+    }
+
+    if (remainingToConsume > 0) {
+      throw new Error('Failed to allocate sufficient credits in FIFO order');
     }
 
     // 3. Create consumption record
@@ -225,40 +238,43 @@ export async function consume(params: {
 
 // --- Revoke (restore credits from a consumed record) ---
 
-export async function revoke(consumeCreditId: string) {
-  const [consumeRecord] = await db()
-    .select()
-    .from(credit)
-    .where(
-      and(
-        eq(credit.id, consumeCreditId),
-        eq(credit.transactionType, CreditTransactionType.CONSUME),
-        eq(credit.status, CreditStatus.ACTIVE)
+export async function revoke(consumeCreditId: string, tx?: any) {
+  const execute = async (trx: any): Promise<boolean> => {
+    // 先在事务内用条件更新抢占撤销资格，杜绝并发重复退款
+    const [revokedRecord] = await trx
+      .update(credit)
+      .set({ status: CreditStatus.DELETED })
+      .where(
+        and(
+          eq(credit.id, consumeCreditId),
+          eq(credit.transactionType, CreditTransactionType.CONSUME),
+          eq(credit.status, CreditStatus.ACTIVE)
+        )
       )
-    )
-    .limit(1);
+      .returning();
 
-  if (!consumeRecord || !consumeRecord.consumedDetail) return;
+    if (!revokedRecord || !revokedRecord.consumedDetail) return false;
 
-  const items = JSON.parse(consumeRecord.consumedDetail);
+    const items = JSON.parse(revokedRecord.consumedDetail);
+    if (!Array.isArray(items) || items.length === 0) return false;
 
-  await db().transaction(async (tx: any) => {
-    // Atomic increment per source grant — no read-modify-write race.
+    // 原子逐笔回补原始赠分/充值批次余量
     for (const item of items) {
-      await tx
+      const creditsConsumed = Number(item?.creditsConsumed || 0);
+      if (!item?.creditId || creditsConsumed <= 0) continue;
+      await trx
         .update(credit)
         .set({
-          remainingCredits: sql`${credit.remainingCredits} + ${item.creditsConsumed}`,
+          remainingCredits: sql`${credit.remainingCredits} + ${creditsConsumed}`,
         })
         .where(eq(credit.id, item.creditId));
     }
 
-    // Mark consumption record as deleted
-    await tx
-      .update(credit)
-      .set({ status: CreditStatus.DELETED })
-      .where(eq(credit.id, consumeCreditId));
-  });
+    return true;
+  };
+
+  if (tx) return execute(tx);
+  return db().transaction(execute);
 }
 
 // --- Auto-grant for new user ---
@@ -267,8 +283,9 @@ export async function grantForNewUser(params: {
   userId: string;
   userEmail?: string;
   configs: Record<string, string>;
+  clientIp?: string;
 }) {
-  const { userId, userEmail, configs } = params;
+  const { userId, userEmail, configs, clientIp } = params;
 
   // 若后台尚未持久化配置，默认启用 30 积分新手礼（仅显式设为 false 时关闭）
   const enabled = configs.initial_credits_enabled ?? 'true';
@@ -276,6 +293,36 @@ export async function grantForNewUser(params: {
 
   const credits = parseInt(configs.initial_credits_amount ?? '30', 10) || 0;
   if (credits <= 0) return;
+
+  // 同 IP 在 24 小时内最多允许领取 3 次新手试用积分，防止批量注册薅取体验金
+  const normalizedIp = (clientIp || '').trim();
+  const maxGrantsPerIp24h = Math.max(
+    1,
+    parseInt(configs.initial_credits_ip_limit ?? '3', 10) || 3
+  );
+  if (normalizedIp && normalizedIp !== '127.0.0.1' && normalizedIp !== '::1') {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentGiftGrants = await db()
+      .select({ id: credit.id })
+      .from(credit)
+      .innerJoin(user, eq(credit.userId, user.id))
+      .where(
+        and(
+          eq(user.ip, normalizedIp),
+          eq(credit.transactionType, CreditTransactionType.GRANT),
+          eq(credit.transactionScene, CreditTransactionScene.GIFT),
+          gte(credit.createdAt, cutoff)
+        )
+      )
+      .limit(maxGrantsPerIp24h);
+
+    if (recentGiftGrants.length >= maxGrantsPerIp24h) {
+      console.warn(
+        `[credits] 触发同 IP 新手积分防刷限流: ip=${normalizedIp}, count=${recentGiftGrants.length}`
+      );
+      return null;
+    }
+  }
 
   const validDays =
     parseInt(configs.initial_credits_valid_days ?? '365', 10) || 0;

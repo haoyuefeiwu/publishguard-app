@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -11,11 +11,13 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  UserPlus,
   Wand2,
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
+import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { KDP_PRIMARY_CATEGORIES } from '@/modules/kdp/constants';
 import { cn } from '@/lib/utils';
@@ -46,7 +48,15 @@ interface AuditData {
   };
   suggestions: Array<{ original: string; replacement: string }>;
   checks_not_run?: Array<{ code: string; title: string; reason: string }>;
+  extracted_meta?: {
+    title?: string;
+    author_name?: string;
+    language?: string;
+  };
+  extracted_excerpt?: string;
 }
+
+const GUARD_DRAFT_STORAGE_KEY = 'pg_guard_workbench_draft_v1';
 
 const RISKY_SAMPLE = {
   title: 'The Crystal Code',
@@ -66,6 +76,7 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
   const t = useTranslations('studio.guard');
   const locale = useLocale();
   const auditLang = locale.startsWith('zh') ? 'zh' : 'en';
+  const { data: session } = useSession();
 
   const [mode, setMode] = useState<'dual' | 'ebook' | 'paperback'>('dual');
   const [title, setTitle] = useState('');
@@ -81,6 +92,61 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
   const [sanitizing, setSanitizing] = useState(false);
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [sanitizedOutput, setSanitizedOutput] = useState('');
+  const [authGateNeeded, setAuthGateNeeded] = useState(false);
+
+  // 登录/注册回跳后自动恢复上次扫码/粘贴草稿与体检报告
+  useEffect(() => {
+    try {
+      const rawDraft = sessionStorage.getItem(GUARD_DRAFT_STORAGE_KEY);
+      if (!rawDraft) return;
+      const draft = JSON.parse(rawDraft);
+      if (draft.mode) setMode(draft.mode);
+      if (typeof draft.title === 'string') setTitle(draft.title);
+      if (typeof draft.subtitle === 'string') setSubtitle(draft.subtitle);
+      if (typeof draft.authorName === 'string') setAuthorName(draft.authorName);
+      if (typeof draft.category === 'string') setCategory(draft.category);
+      if (typeof draft.companionDomain === 'string')
+        setCompanionDomain(draft.companionDomain);
+      if (typeof draft.description === 'string')
+        setDescription(draft.description);
+      if (typeof draft.manuscriptText === 'string')
+        setManuscriptText(draft.manuscriptText);
+      if (draft.audit && typeof draft.audit === 'object') setAudit(draft.audit);
+    } catch {
+      // 忽略损坏草稿
+    }
+  }, []);
+
+  useEffect(() => {
+    if (session?.user) {
+      setAuthGateNeeded(false);
+    }
+  }, [session?.user]);
+
+  function saveDraftSnapshot(
+    nextAudit: AuditData | null,
+    nextManuscript?: string
+  ) {
+    try {
+      sessionStorage.setItem(
+        GUARD_DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          mode,
+          title,
+          subtitle,
+          authorName,
+          category,
+          companionDomain,
+          description,
+          manuscriptText:
+            nextManuscript !== undefined ? nextManuscript : manuscriptText,
+          audit: nextAudit,
+        })
+      );
+    } catch {
+      // 忽略 storage 配额异常
+    }
+  }
 
   function fillRiskyExample() {
     setTitle(RISKY_SAMPLE.title);
@@ -134,7 +200,23 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
       if (json.code !== 0) {
         throw new Error(json.message || 'Scan failed');
       }
-      setAudit(json.data.audit);
+      const nextAudit: AuditData = json.data.audit;
+      setAudit(nextAudit);
+      setAuthGateNeeded(false);
+
+      // 若来自 EPUB 上传，自动将抽出的元数据与可读摘录填充至编辑区，打通后续 AI 洗稿闭环
+      let resolvedManuscript = manuscriptText;
+      if (nextAudit.extracted_excerpt && !manuscriptText.trim()) {
+        resolvedManuscript = nextAudit.extracted_excerpt;
+        setManuscriptText(resolvedManuscript);
+      }
+      if (nextAudit.extracted_meta?.title && !title.trim()) {
+        setTitle(nextAudit.extracted_meta.title);
+      }
+      if (nextAudit.extracted_meta?.author_name && !authorName.trim()) {
+        setAuthorName(nextAudit.extracted_meta.author_name);
+      }
+      saveDraftSnapshot(nextAudit, resolvedManuscript);
     } catch (err: any) {
       toast.error(err?.message || 'Scan failed');
     } finally {
@@ -143,11 +225,21 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
   }
 
   async function handleSanitize() {
-    const source = manuscriptText.trim() || description.trim();
+    const source =
+      manuscriptText.trim() ||
+      audit?.extracted_excerpt?.trim() ||
+      description.trim();
     if (!source) {
       toast.error('Please enter manuscript text or description first');
       return;
     }
+
+    if (!session?.user) {
+      saveDraftSnapshot(audit, source);
+      setAuthGateNeeded(true);
+      return;
+    }
+
     setSanitizing(true);
     try {
       const res = await fetch('/api/kdp/guard/sanitize', {
@@ -157,6 +249,15 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
       });
       const json = await res.json();
       if (json.code !== 0) {
+        if (
+          String(json.message || '')
+            .toLowerCase()
+            .includes('sign in')
+        ) {
+          saveDraftSnapshot(audit, source);
+          setAuthGateNeeded(true);
+          return;
+        }
         throw new Error(json.message || 'Sanitize failed');
       }
       setSanitizedOutput(json.data.sanitizedText);
@@ -169,6 +270,18 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
       setSanitizing(false);
     }
   }
+
+  const studioNewParams = new URLSearchParams();
+  if (title.trim()) studioNewParams.set('topic', title.trim());
+  else if (description.trim())
+    studioNewParams.set('topic', description.trim().slice(0, 120));
+  if (category.trim()) studioNewParams.set('category', category.trim());
+  if (companionDomain.trim())
+    studioNewParams.set('domain', companionDomain.trim());
+  const studioNewHref = studioNewParams.toString()
+    ? `/studio/new?${studioNewParams.toString()}`
+    : '/studio/new';
+  const authCallbackUrl = encodeURIComponent('/tools/kdp-guard');
 
   return (
     <div className="border-border bg-card w-full rounded-2xl border p-5 text-left shadow-sm sm:p-7">
@@ -413,6 +526,40 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
             </div>
           </div>
 
+          {/* 游客点击 AI 洗稿时内联引导免费注册领 30 积分（草稿已保存，回跳无缝恢复） */}
+          {authGateNeeded && (
+            <div className="space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs">
+              <div className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
+                <UserPlus className="size-4 shrink-0" />
+                {t('auth_gate_title')}
+              </div>
+              <p className="text-muted-foreground leading-relaxed">
+                {t('auth_gate_desc')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/sign-up?callbackUrl=${authCallbackUrl}`}
+                  className={cn(
+                    buttonVariants({ size: 'sm' }),
+                    'gap-1.5 rounded-full'
+                  )}
+                >
+                  {t('btn_signup_sanitize')}
+                  <ArrowRight className="size-3.5" />
+                </Link>
+                <Link
+                  href={`/sign-in?callbackUrl=${authCallbackUrl}`}
+                  className={cn(
+                    buttonVariants({ variant: 'outline', size: 'sm' }),
+                    'rounded-full'
+                  )}
+                >
+                  {t('btn_signin_sanitize')}
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* 顶部优先修复前三项摘要（最值得立即修改的问题与位置） */}
           {audit.errors.length > 0 && (
             <div className="border-border bg-muted/30 space-y-2 rounded-xl border p-4 text-xs">
@@ -594,13 +741,13 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
               </div>
             </div>
             <Link
-              href="/studio/new"
+              href={studioNewHref}
               className={cn(
                 buttonVariants({ size: 'sm' }),
                 'shrink-0 gap-1.5 rounded-full'
               )}
             >
-              Open Book Studio
+              {t('btn_open_studio_prefill')}
               <ArrowRight className="size-3.5" />
             </Link>
           </div>

@@ -69,15 +69,31 @@ export async function POST(req: Request) {
         lang: String(form.get('lang') || 'en'),
       };
     } else {
-      payload = await req.json().catch(() => ({}));
+      const rawJson = await req.json().catch(() => ({}));
+      payload = rawJson && typeof rawJson === 'object' ? rawJson : {};
+      if (typeof payload.epub_base64 === 'string' && payload.epub_base64) {
+        let cleanedB64 = payload.epub_base64.trim();
+        const commaIdx = cleanedB64.indexOf(',');
+        if (cleanedB64.startsWith('data:') && commaIdx !== -1) {
+          cleanedB64 = cleanedB64.slice(commaIdx + 1).trim();
+        }
+        if (cleanedB64.length > 21 * 1024 * 1024) {
+          return respErr('EPUB file exceeds 15MB limit');
+        }
+        const decodedBytes = Buffer.byteLength(cleanedB64, 'base64');
+        if (decodedBytes > 15 * 1024 * 1024) {
+          return respErr('EPUB file exceeds 15MB limit');
+        }
+        epubBase64 = cleanedB64;
+      }
     }
 
     if (
       !epubBase64 &&
-      !payload.title?.trim() &&
-      !payload.subtitle?.trim() &&
-      !payload.description?.trim() &&
-      !payload.manuscript_text?.trim()
+      !String(payload.title || '').trim() &&
+      !String(payload.subtitle || '').trim() &&
+      !String(payload.description || '').trim() &&
+      !String(payload.manuscript_text || '').trim()
     ) {
       return respErr(
         'Please enter a book title, manuscript snippet, or upload an EPUB file.'
@@ -94,14 +110,33 @@ export async function POST(req: Request) {
       userId: session?.user?.id || null,
       projectId: payload.project_id || null,
       clientIp,
-      title: payload.title,
-      subtitle: payload.subtitle,
-      description: payload.description,
-      authorName: payload.author_name,
-      primaryCategory: payload.primary_category,
-      manuscriptText: payload.manuscript_text,
-      epubBase64: epubBase64 || payload.epub_base64 || undefined,
-      companionDomain: payload.companion_domain,
+      title:
+        typeof payload.title === 'string' ? payload.title.slice(0, 500) : '',
+      subtitle:
+        typeof payload.subtitle === 'string'
+          ? payload.subtitle.slice(0, 500)
+          : '',
+      description:
+        typeof payload.description === 'string'
+          ? payload.description.slice(0, 10_000)
+          : '',
+      authorName:
+        typeof payload.author_name === 'string'
+          ? payload.author_name.slice(0, 300)
+          : '',
+      primaryCategory:
+        typeof payload.primary_category === 'string'
+          ? payload.primary_category.slice(0, 200)
+          : '',
+      manuscriptText:
+        typeof payload.manuscript_text === 'string'
+          ? payload.manuscript_text.slice(0, 1_500_000)
+          : '',
+      epubBase64: epubBase64 || undefined,
+      companionDomain:
+        typeof payload.companion_domain === 'string'
+          ? payload.companion_domain.slice(0, 300)
+          : '',
       mode: payload.mode || 'dual',
       lang,
       checkLiveCollisions: payload.check_live_collisions !== false,

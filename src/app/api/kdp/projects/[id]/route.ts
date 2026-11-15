@@ -1,11 +1,12 @@
 import { headers } from 'next/headers';
-import { and, eq } from 'drizzle-orm';
 
 import { getAuth } from '@/core/auth';
-import { db } from '@/core/db';
-import { kdpProject } from '@/config/db/schema';
 import { getBalance } from '@/modules/credits/service';
-import { getProjectDetail, updateProjectSettings } from '@/modules/kdp/service';
+import {
+  deleteProjectSafely,
+  getProjectDetail,
+  updateProjectSettings,
+} from '@/modules/kdp/service';
 import { respData, respErr } from '@/lib/resp';
 
 export async function GET(
@@ -78,13 +79,9 @@ export async function DELETE(
     if (!session?.user) return respErr('Unauthorized');
 
     const { id } = await context.params;
-    await db()
-      .delete(kdpProject)
-      .where(
-        and(eq(kdpProject.id, id), eq(kdpProject.userId, session.user.id))
-      );
+    const result = await deleteProjectSafely(session.user.id, id);
 
-    return respData({ deleted: true });
+    return respData(result);
   } catch (err: any) {
     return respErr(err?.message || 'Failed to delete project');
   }

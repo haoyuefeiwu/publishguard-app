@@ -31,7 +31,12 @@
     "tier_risk_advisory": "Risk Advisory",
     "top_fixes_title": "Top 3 Priority Fixes Before Uploading",
     "manual_checks_title": "Checks Requiring Manual Confirmation",
-    "clean_text_title": "Sanitized Output Ready to Copy"
+    "clean_text_title": "Sanitized Output Ready to Copy",
+    "auth_gate_title": "Sign up free to run AI Compliance Sanitize (30 free credits included)",
+    "auth_gate_desc": "Your scanned draft is saved in this browser. Create a free account or sign in to unlock 30 welcome credits — enough for 1 AI Sanitize (15 credits) plus 1 Collision-Proof Book Outline (10 credits).",
+    "btn_signup_sanitize": "Sign Up Free & Continue Sanitize",
+    "btn_signin_sanitize": "Sign In & Return",
+    "btn_open_studio_prefill": "Rebuild Safe 18k+ Book in Studio"
   },
   "studio": {
     "title": "PublishGuard Book Studio",
@@ -45,10 +50,18 @@
     "step3_title": "Step 3: Compile Dual-Format KDP Bundle (100 Credits) & Checklist",
     "btn_create_outline": "Generate Safe Blueprint & Check Collisions (10 Credits)",
     "btn_preview_ch1": "Generate Chapter 1 Free Preview",
+    "btn_quick_recompile": "Quick Recompile Bundle (10 Credits · Zero LLM Cost)",
     "btn_generate_all": "Compile Full Book + EPUB + 6×9 Print PDF (100 Credits)",
     "btn_download_zip": "Download Complete KDP_Ready_Bundle.zip",
     "btn_copy": "Copy",
-    "copied": "Copied to clipboard"
+    "copied": "Copied to clipboard",
+    "snapshot_stale_title": "Unexported changes detected vs. downloaded bundle",
+    "snapshot_stale_desc": "You changed the book title, cover theme, or trim specs after your last compilation. Recompile with 10 credits (no LLM rewrite needed) so your downloaded EPUB, Cover Wrap PDF, and Guard score match the displayed specs.",
+    "failed_refund_title": "Last build failed — 100% credits automatically refunded",
+    "failed_refund_desc": "Your credits were returned to your balance. Any previously completed deliverable bundle below remains intact.",
+    "toast_theme_updated": "Cover architecture updated",
+    "toast_title_updated": "Main title updated",
+    "toast_recompile_enqueued": "Quick bundle recompile enqueued! Tracking live progress..."
   },
   "profiles": {
     "title": "Pen Name Brand & Cadence Organizer",

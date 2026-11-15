@@ -10,12 +10,15 @@ PublishGuard KDP Pre-Flight 26 项零风控合规审计服务。
 from __future__ import annotations
 
 import argparse
+import html as _html
 import io
 import json
+import posixpath
 import re
 import sys
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -207,6 +210,8 @@ class GuardAuditResult:
     collisions: dict[str, Any] = field(default_factory=dict)
     suggestions: list[dict[str, str]] = field(default_factory=list)
     checks_not_run: list[dict[str, str]] = field(default_factory=list)
+    extracted_meta: dict[str, str] = field(default_factory=dict)
+    extracted_excerpt: str = ""
 
 
 def strip_html_tags(raw_text: str) -> str:
@@ -928,13 +933,58 @@ def run_preflight_audit(
     )
 
 
+MAX_EPUB_ZIP_BYTES = 15 * 1024 * 1024
+MAX_EPUB_ENTRIES = 2000
+MAX_EPUB_ENTRY_BYTES = 15 * 1024 * 1024
+MAX_EPUB_TOTAL_UNCOMPRESSED_BYTES = 60 * 1024 * 1024
+
+
+class _ZipBombLimitError(ValueError):
+    """EPUB 压缩包超出安全体积、条目数或解压膨胀上限。"""
+
+
+def _xml_localname(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1].lower() if "}" in tag else tag.lower()
+
+
+def _safe_parse_xml(raw_bytes: bytes) -> ET.Element:
+    """安全解析 container.xml / OPF，显式拒绝 DOCTYPE/ENTITY 实体注入。"""
+    if re.search(rb"<!\s*(?:DOCTYPE|ENTITY)\b", raw_bytes, flags=re.IGNORECASE):
+        raise ValueError("Disallowed DOCTYPE or ENTITY declaration in XML")
+    return ET.fromstring(raw_bytes)
+
+
+def _normalize_zip_rel_path(base_dir: str, href: str) -> str:
+    raw_href = urllib.parse.unquote((href or "").split("#", 1)[0].split("?", 1)[0]).strip()
+    joined = posixpath.join(base_dir, raw_href) if base_dir else raw_href
+    norm = posixpath.normpath(joined.replace("\\", "/")).lstrip("/")
+    if not norm or norm == "." or norm.startswith("..") or "/../" in norm:
+        return ""
+    return norm
+
+
+def _safe_read_entry(zf: zipfile.ZipFile, info: zipfile.ZipInfo, budget: list[int]) -> bytes:
+    """按严格字节预算读取单个 ZIP 条目，防止伪造头部引发解压炸弹 OOM。"""
+    if info.file_size > MAX_EPUB_ENTRY_BYTES or info.file_size > budget[0]:
+        raise _ZipBombLimitError("EPUB entry exceeds safe uncompressed byte limit")
+    max_allowed = min(MAX_EPUB_ENTRY_BYTES, budget[0])
+    with zf.open(info, "r") as stream:
+        data = stream.read(max_allowed + 1)
+    if len(data) > max_allowed:
+        raise _ZipBombLimitError("EPUB uncompressed content exceeds safe budget")
+    budget[0] -= len(data)
+    return data
+
+
 def audit_epub_bytes(epub_bytes: bytes, **kwargs: Any) -> GuardAuditResult:
-    """解包上传的 EPUB 文件，校验容器结构（mimetype/OPF/正文）、CSS 与图片色彩模式后执行全量检查。"""
+    """解包上传的 EPUB 文件，严格校验尺寸/ZIP 炸弹上限及 container.xml->OPF->manifest->spine 引用链后执行全量检查。"""
     lang = _norm_lang(kwargs.pop("lang", "en"))
     mode = str(kwargs.pop("mode", "ebook") or "ebook")
     if mode not in ("ebook", "paperback", "dual"):
         mode = "ebook"
     extracted_title = str(kwargs.pop("title", "") or "").strip()
+    extracted_author = str(kwargs.pop("author_name", "") or "").strip()
+    extracted_lang = lang
 
     def _container_fail(
         code: str, msg_en: str, msg_zh: str, matched: str, sug_en: str, sug_zh: str
@@ -970,15 +1020,59 @@ def audit_epub_bytes(epub_bytes: bytes, **kwargs: Any) -> GuardAuditResult:
             "请上传完整编译的 .epub 电子书文件。",
         )
 
+    if len(epub_bytes) > MAX_EPUB_ZIP_BYTES:
+        return _container_fail(
+            "EPUB_TOO_LARGE",
+            "Uploaded EPUB file exceeds the 15 MB safety limit.",
+            "上传的 EPUB 文件超过 15 MB 安全体积上限。",
+            f"{len(epub_bytes)} bytes",
+            "Compress oversized images or split media assets so the EPUB stays under 15 MB.",
+            "请压缩过大的图片资产，确保 EPUB 体积不超过 15 MB。",
+        )
+
     extra_findings: list[GuardFinding] = []
     html_chunks: list[str] = []
     prose_chunks: list[str] = []
-    has_opf = False
 
     try:
         with zipfile.ZipFile(io.BytesIO(epub_bytes), "r") as zf:
             infos = zf.infolist()
+            if len(infos) > MAX_EPUB_ENTRIES:
+                return _container_fail(
+                    "EPUB_TOO_MANY_ENTRIES",
+                    f"EPUB archive contains {len(infos)} entries, exceeding the 2,000-entry limit.",
+                    f"EPUB 包内包含 {len(infos)} 个条目，超过 2,000 条安全上限。",
+                    f"{len(infos)} entries",
+                    "Remove unused resource files and re-export the EPUB cleanly.",
+                    "请清理冗余资源文件后重新打包导出 EPUB。",
+                )
+
+            declared_total = sum(max(0, info.file_size) for info in infos)
+            if declared_total > MAX_EPUB_TOTAL_UNCOMPRESSED_BYTES:
+                return _container_fail(
+                    "EPUB_UNCOMPRESSED_LIMIT_EXCEEDED",
+                    "EPUB uncompressed size exceeds the 60 MB archive expansion limit.",
+                    "EPUB 解压后总大小超过 60 MB 安全上限，拒绝解析。",
+                    f"{declared_total} bytes",
+                    "Optimize embedded images and verify archive integrity.",
+                    "请优化内嵌图片体积并确认压缩包无异常膨胀。",
+                )
+
+            remaining_budget = [MAX_EPUB_TOTAL_UNCOMPRESSED_BYTES]
             names = [info.filename for info in infos]
+            info_by_name: dict[str, zipfile.ZipInfo] = {}
+            for info in infos:
+                if info.filename.startswith("/") or ".." in info.filename.replace("\\", "/").split("/"):
+                    return _container_fail(
+                        "EPUB_UNSAFE_PATH",
+                        f"Unsafe ZIP entry path `{info.filename}` detected.",
+                        f"检测到不安全的压缩包路径 `{info.filename}`。",
+                        info.filename,
+                        "Repackage EPUB using standard relative container paths.",
+                        "请使用标准相对路径重新打包 EPUB。",
+                    )
+                info_by_name[info.filename] = info
+
             if not names or names[0] != "mimetype":
                 extra_findings.append(
                     GuardFinding(
@@ -1000,7 +1094,7 @@ def audit_epub_bytes(epub_bytes: bytes, **kwargs: Any) -> GuardAuditResult:
                     )
                 )
             else:
-                mime_raw = zf.read("mimetype").decode("ascii", errors="ignore").strip()
+                mime_raw = _safe_read_entry(zf, infos[0], remaining_budget).decode("ascii", errors="ignore").strip()
                 if mime_raw != "application/epub+zip":
                     extra_findings.append(
                         GuardFinding(
@@ -1025,70 +1119,298 @@ def audit_epub_bytes(epub_bytes: bytes, **kwargs: Any) -> GuardAuditResult:
                     extra_findings.append(
                         GuardFinding(
                             code="EPUB_MIMETYPE_COMPRESSED",
-                            severity="warning",
+                            severity="error",
                             rule_ref="EPUB 3 Container Spec",
                             rule_tier="platform_spec",
                             message=_tx(
                                 lang,
-                                "`mimetype` entry is compressed; EPUB 3 specification requires uncompressed (ZIP_STORED) storage.",
-                                "`mimetype` 条目被压缩存储；EPUB 3 规范要求采用无压缩（ZIP_STORED）。",
+                                "`mimetype` entry is compressed; EPUB 3 specification strictly requires uncompressed (ZIP_STORED) storage.",
+                                "`mimetype` 条目被压缩存储；EPUB 3 规范严格要求采用无压缩（ZIP_STORED）存储。",
                             ),
                             matched_text="compressed mimetype",
                             suggestion=_tx(
                                 lang,
                                 "Store `mimetype` with ZIP_STORED when packaging EPUB.",
-                                "打包 EPUB 时为 `mimetype` 使用 ZIP_STORED 无压缩模式。",
+                                "打包 EPUB 时必须为 `mimetype` 使用 ZIP_STORED 无压缩模式。",
                             ),
                         )
                     )
 
-            for name in names:
-                lower = name.lower()
-                if lower.endswith(".opf"):
-                    has_opf = True
-                    raw_opf = zf.read(name).decode("utf-8", errors="ignore")
-                    if not extracted_title:
-                        m_title = re.search(r"<dc:title[^>]*>(.*?)</dc:title>", raw_opf, flags=re.IGNORECASE | re.DOTALL)
-                        if m_title:
-                            import html as _html
+            # 1. 强校验 META-INF/container.xml -> .opf 引用链
+            opf_path = ""
+            container_info = info_by_name.get("META-INF/container.xml")
+            if not container_info:
+                extra_findings.append(
+                    GuardFinding(
+                        code="EPUB_MISSING_CONTAINER_XML",
+                        severity="error",
+                        rule_ref="EPUB 3 OCF Container Spec",
+                        rule_tier="platform_spec",
+                        message=_tx(
+                            lang,
+                            "Missing `META-INF/container.xml` pointer; readers and Kindle ingestion cannot locate the OPF package.",
+                            "缺少必需的 `META-INF/container.xml` 容器索引文件，Kindle 与阅读器无法定位 OPF 包结构。",
+                        ),
+                        matched_text="META-INF/container.xml",
+                        suggestion=_tx(
+                            lang,
+                            "Ensure a valid `META-INF/container.xml` pointing to the `.opf` package document is included.",
+                            "请确保 EPUB 包含指向 `.opf` 包文档的标准 `META-INF/container.xml`。",
+                        ),
+                    )
+                )
+            else:
+                try:
+                    container_root = _safe_parse_xml(_safe_read_entry(zf, container_info, remaining_budget))
+                    for elem in container_root.iter():
+                        if _xml_localname(elem.tag) == "rootfile":
+                            full_path = (elem.attrib.get("full-path") or "").strip()
+                            media_type = (elem.attrib.get("media-type") or "").strip()
+                            if full_path and (
+                                not media_type or media_type == "application/oebps-package+xml"
+                            ):
+                                opf_path = _normalize_zip_rel_path("", full_path)
+                                break
+                    if not opf_path or opf_path not in info_by_name:
+                        extra_findings.append(
+                            GuardFinding(
+                                code="EPUB_INVALID_CONTAINER_XML",
+                                severity="error",
+                                rule_ref="EPUB 3 OCF Container Spec",
+                                rule_tier="platform_spec",
+                                message=_tx(
+                                    lang,
+                                    "`META-INF/container.xml` does not point to an existing `.opf` package file.",
+                                    "`META-INF/container.xml` 未指向包内实际存在的 `.opf` 元数据文件。",
+                                ),
+                                matched_text=opf_path or "missing rootfile",
+                                suggestion=_tx(
+                                    lang,
+                                    "Fix `rootfile/@full-path` in `META-INF/container.xml` to match your OPF file.",
+                                    "请修正 `META-INF/container.xml` 中 `rootfile` 的 `full-path` 路径。",
+                                ),
+                            )
+                        )
+                        opf_path = ""
+                except _ZipBombLimitError:
+                    raise
+                except Exception as exc:
+                    extra_findings.append(
+                        GuardFinding(
+                            code="EPUB_INVALID_CONTAINER_XML",
+                            severity="error",
+                            rule_ref="EPUB 3 OCF Container Spec",
+                            rule_tier="platform_spec",
+                            message=_tx(
+                                lang,
+                                f"`META-INF/container.xml` failed XML validation: {exc}",
+                                f"`META-INF/container.xml` XML 语法校验失败：{exc}",
+                            ),
+                            matched_text="invalid container.xml",
+                            suggestion=_tx(
+                                lang,
+                                "Regenerate a well-formed UTF-8 `META-INF/container.xml`.",
+                                "请重新生成格式合规的 UTF-8 `META-INF/container.xml`。",
+                            ),
+                        )
+                    )
+                    opf_path = ""
 
-                            extracted_title = _html.unescape(m_title.group(1)).strip()
+            # 2. 强校验 OPF -> <manifest> -> <spine>
+            spine_content_paths: list[str] = []
+            css_paths: list[str] = []
+            image_paths: list[str] = []
+
+            if not opf_path:
+                if container_info is None:
+                    # 上面已报 MISSING_CONTAINER_XML，但若无 OPF 仍需显式标出缺失 OPF
+                    extra_findings.append(
+                        GuardFinding(
+                            code="EPUB_MISSING_OPF",
+                            severity="error",
+                            rule_ref="EPUB 3 Package Spec",
+                            rule_tier="platform_spec",
+                            message=_tx(
+                                lang,
+                                "Missing `.opf` package document referenced by container.xml; required for Amazon KDP ingestion.",
+                                "无法通过 container.xml 定位有效 `.opf` 包元数据文件，Amazon KDP 将拒收此书。",
+                            ),
+                            matched_text="missing .opf",
+                            suggestion=_tx(
+                                lang,
+                                "Include a valid OPF manifest and spine via an EPUB 3 compiler.",
+                                "请通过标准 EPUB 3 编译器生成完整的 OPF 清单与 Spine 结构。",
+                            ),
+                        )
+                    )
+            else:
+                opf_dir = posixpath.dirname(opf_path)
+                try:
+                    opf_root = _safe_parse_xml(_safe_read_entry(zf, info_by_name[opf_path], remaining_budget))
+                    manifest_by_id: dict[str, tuple[str, str]] = {}
+                    spine_idrefs: list[str] = []
+
+                    for elem in opf_root.iter():
+                        lname = _xml_localname(elem.tag)
+                        if lname == "title" and not extracted_title and (elem.text or "").strip():
+                            raw_t = _html.unescape(elem.text or "").strip()
                             sub_kw = str(kwargs.get("subtitle") or "").strip()
-                            if sub_kw and extracted_title.lower().endswith(f": {sub_kw.lower()}"):
-                                extracted_title = extracted_title[: -(len(sub_kw) + 2)].strip()
-                elif lower.endswith((".html", ".xhtml", ".htm")):
-                    raw = zf.read(name).decode("utf-8", errors="ignore")
-                    html_chunks.append(raw)
-                    prose_chunks.append(raw)
-                elif lower.endswith(".css"):
-                    raw_css = zf.read(name).decode("utf-8", errors="ignore")
-                    html_chunks.append(raw_css)
-                elif lower.endswith((".png", ".jpg", ".jpeg")):
-                    try:
-                        img_data = zf.read(name)
-                        with Image.open(io.BytesIO(img_data)) as img:
-                            if img.mode == "1":
-                                extra_findings.append(
-                                    GuardFinding(
-                                        code="IMAGE_1BIT_KINDLE_FREEZE",
-                                        severity="error",
-                                        rule_ref="Kindle Image Spec & Advisory #20",
-                                        rule_tier="platform_spec",
-                                        message=_tx(
-                                            lang,
-                                            f"Image `{name}` uses 1-bit monochrome color mode (common in default QR generators), which can freeze Kindle Previewer at 95%.",
-                                            f"图片 `{name}` 为 1-bit 黑白二值位图（常见于默认 qrcode 库），会导致 Kindle Previewer 永远卡在 95% 报错！",
-                                        ),
-                                        matched_text=name,
-                                        suggestion=_tx(
-                                            lang,
-                                            "Convert image to 8-bit RGB mode before packaging EPUB.",
-                                            "必须转换为 8-bit RGB 格式重新封装导出。",
-                                        ),
-                                    )
+                            if sub_kw and raw_t.lower().endswith(f": {sub_kw.lower()}"):
+                                raw_t = raw_t[: -(len(sub_kw) + 2)].strip()
+                            extracted_title = raw_t
+                        elif lname == "creator" and not extracted_author and (elem.text or "").strip():
+                            extracted_author = _html.unescape(elem.text or "").strip()
+                        elif lname == "language" and (elem.text or "").strip():
+                            extracted_lang = (elem.text or "").strip()[:20]
+                        elif lname == "item":
+                            item_id = (elem.attrib.get("id") or "").strip()
+                            href = (elem.attrib.get("href") or "").strip()
+                            mtype = (elem.attrib.get("media-type") or "").strip().lower()
+                            if item_id and href:
+                                resolved = _normalize_zip_rel_path(opf_dir, href)
+                                manifest_by_id[item_id] = (resolved, mtype)
+                                if mtype == "text/css" or resolved.lower().endswith(".css"):
+                                    if resolved in info_by_name:
+                                        css_paths.append(resolved)
+                                elif mtype.startswith("image/") or resolved.lower().endswith((".png", ".jpg", ".jpeg")):
+                                    if resolved in info_by_name:
+                                        image_paths.append(resolved)
+                        elif lname == "itemref":
+                            idref = (elem.attrib.get("idref") or "").strip()
+                            if idref:
+                                spine_idrefs.append(idref)
+
+                    if not manifest_by_id or not spine_idrefs:
+                        extra_findings.append(
+                            GuardFinding(
+                                code="EPUB_INVALID_OPF_STRUCTURE",
+                                severity="error",
+                                rule_ref="EPUB 3 Package Spec",
+                                rule_tier="platform_spec",
+                                message=_tx(
+                                    lang,
+                                    "OPF package document is missing a valid `<manifest>` or `<spine>` chapter sequence.",
+                                    "`.opf` 文件缺少有效的 `<manifest>` 资源清单或 `<spine>` 阅读顺序序列。",
+                                ),
+                                matched_text=opf_path,
+                                suggestion=_tx(
+                                    lang,
+                                    "Ensure `.opf` contains non-empty `<manifest>` and `<spine>` referencing your chapter XHTML files.",
+                                    "请确保 `.opf` 包含非空的 `<manifest>` 和指向章节 XHTML 的 `<spine>`。",
+                                ),
+                            )
+                        )
+                    else:
+                        broken_refs: list[str] = []
+                        for idref in spine_idrefs:
+                            entry = manifest_by_id.get(idref)
+                            if not entry or not entry[0] or entry[0] not in info_by_name:
+                                broken_refs.append(idref)
+                            else:
+                                spine_content_paths.append(entry[0])
+                        if broken_refs:
+                            extra_findings.append(
+                                GuardFinding(
+                                    code="EPUB_BROKEN_SPINE_REF",
+                                    severity="error",
+                                    rule_ref="EPUB 3 Spine Spec",
+                                    rule_tier="platform_spec",
+                                    message=_tx(
+                                        lang,
+                                        f"OPF `<spine>` references missing manifest/archive items: {', '.join(broken_refs[:5])}.",
+                                        f"OPF `<spine>` 引用了不存在的清单或文件条目：{', '.join(broken_refs[:5])}。",
+                                    ),
+                                    matched_text=", ".join(broken_refs[:5]),
+                                    suggestion=_tx(
+                                        lang,
+                                        "Align every `<spine><itemref>` idref with a valid `<manifest><item>` existing inside the EPUB.",
+                                        "请核对 `<spine>` 与 `<manifest>` 引用路径，确保所有章节文件完整存在。",
+                                    ),
                                 )
-                    except Exception:
-                        pass
+                            )
+                except _ZipBombLimitError:
+                    raise
+                except Exception as exc:
+                    extra_findings.append(
+                        GuardFinding(
+                            code="EPUB_INVALID_OPF_XML",
+                            severity="error",
+                            rule_ref="EPUB 3 Package Spec",
+                            rule_tier="platform_spec",
+                            message=_tx(
+                                lang,
+                                f"OPF package document `{opf_path}` is invalid XML: {exc}",
+                                f"OPF 元数据文件 `{opf_path}` XML 解析失败：{exc}",
+                            ),
+                            matched_text=opf_path,
+                            suggestion=_tx(
+                                lang,
+                                "Recompile the EPUB using a standards-compliant EPUB 3 packager.",
+                                "请使用标准 EPUB 3 打包工具重新生成合乎 XML 规范的 OPF 文件。",
+                            ),
+                        )
+                    )
+
+            # 仅统计有效 spine 引用的 XHTML/HTML 章节正文，彻底堵住孤立散落 XHTML 绕过检测
+            for sp_path in spine_content_paths:
+                sp_info = info_by_name.get(sp_path)
+                if not sp_info:
+                    continue
+                raw = _safe_read_entry(zf, sp_info, remaining_budget).decode("utf-8", errors="ignore")
+                html_chunks.append(raw)
+                prose_chunks.append(raw)
+
+            # 扫描 manifest 引用的 CSS 及包内其余未列出的 CSS
+            seen_css: set[str] = set()
+            for cp in css_paths + [n for n in names if n.lower().endswith(".css")]:
+                if cp in seen_css or cp not in info_by_name:
+                    continue
+                seen_css.add(cp)
+                raw_css = _safe_read_entry(zf, info_by_name[cp], remaining_budget).decode("utf-8", errors="ignore")
+                html_chunks.append(raw_css)
+
+            # 扫描所有图片色彩模式（含 1-bit Kindle 卡死风险图）
+            seen_imgs: set[str] = set()
+            for ip in image_paths + [n for n in names if n.lower().endswith((".png", ".jpg", ".jpeg"))]:
+                if ip in seen_imgs or ip not in info_by_name:
+                    continue
+                seen_imgs.add(ip)
+                try:
+                    img_data = _safe_read_entry(zf, info_by_name[ip], remaining_budget)
+                    with Image.open(io.BytesIO(img_data)) as img:
+                        if img.mode == "1":
+                            extra_findings.append(
+                                GuardFinding(
+                                    code="IMAGE_1BIT_KINDLE_FREEZE",
+                                    severity="error",
+                                    rule_ref="Kindle Image Spec & Advisory #20",
+                                    rule_tier="platform_spec",
+                                    message=_tx(
+                                        lang,
+                                        f"Image `{ip}` uses 1-bit monochrome color mode (common in default QR generators), which can freeze Kindle Previewer at 95%.",
+                                        f"图片 `{ip}` 为 1-bit 黑白二值位图（常见于默认 qrcode 库），会导致 Kindle Previewer 永远卡在 95% 报错！",
+                                    ),
+                                    matched_text=ip,
+                                    suggestion=_tx(
+                                        lang,
+                                        "Convert image to 8-bit RGB mode before packaging EPUB.",
+                                        "必须转换为 8-bit RGB 格式重新封装导出。",
+                                    ),
+                                )
+                            )
+                except _ZipBombLimitError:
+                    raise
+                except Exception:
+                    pass
+    except _ZipBombLimitError as exc:
+        return _container_fail(
+            "EPUB_ZIP_BOMB_LIMIT",
+            str(exc),
+            f"EPUB 超出解压安全上限：{exc}",
+            "archive limit exceeded",
+            "Verify your EPUB container contains no corrupted or abnormally compressed entries.",
+            "请检查 EPUB 压缩包是否包含异常膨胀条目或非法嵌套文件。",
+        )
     except (zipfile.BadZipFile, EOFError, OSError, RuntimeError, ValueError):
         return _container_fail(
             "INVALID_EPUB_ARCHIVE",
@@ -1097,27 +1419,6 @@ def audit_epub_bytes(epub_bytes: bytes, **kwargs: Any) -> GuardAuditResult:
             "corrupt archive",
             "Re-export your EPUB file from your formatting tool or PublishGuard Studio and upload again.",
             "请确认上传的是标准未损坏的 .epub 电子书包，重新导出后再试。",
-        )
-
-    if not has_opf:
-        extra_findings.append(
-            GuardFinding(
-                code="EPUB_MISSING_OPF",
-                severity="error",
-                rule_ref="EPUB 3 Package Spec",
-                rule_tier="platform_spec",
-                message=_tx(
-                    lang,
-                    "Missing `.opf` package document inside EPUB archive; required for Amazon KDP ingestion.",
-                    "EPUB 包内缺少必需的 `.opf` 元数据索引文件，Amazon KDP 无法识别书稿结构。",
-                ),
-                matched_text="missing .opf",
-                suggestion=_tx(
-                    lang,
-                    "Include a valid OPF manifest and spine via an EPUB 3 compiler.",
-                    "请通过标准 EPUB 3 编译器生成完整的 OPF 清单与 Spine 结构。",
-                ),
-            )
         )
 
     prose_word_count = count_words("\n".join(prose_chunks))
@@ -1130,26 +1431,37 @@ def audit_epub_bytes(epub_bytes: bytes, **kwargs: Any) -> GuardAuditResult:
                 rule_tier="platform_spec",
                 message=_tx(
                     lang,
-                    "EPUB contains no readable XHTML/HTML chapter content (0 manuscript words found).",
-                    "EPUB 包内未检测到任何有效 HTML/XHTML 章节正文内容（纯正文词数为 0）。",
+                    "EPUB contains no readable XHTML/HTML chapter prose referenced by OPF `<spine>` (0 manuscript words found).",
+                    "EPUB 的 OPF `<spine>` 中未检测到任何有效可读章节正文（纯正文词数为 0）。",
                 ),
                 matched_text="0 content words",
                 suggestion=_tx(
                     lang,
-                    "Ensure chapter XHTML documents are packaged inside the EPUB container before uploading.",
-                    "请检查电子书包内是否已正确打包章节 HTML/XHTML 正文文件。",
+                    "Ensure chapter XHTML documents are declared in `<manifest>` and `<spine>` inside the EPUB container.",
+                    "请检查章节 HTML/XHTML 是否已在 OPF `<manifest>` 与 `<spine>` 中正确声明并打包。",
                 ),
             )
         )
 
     manuscript_raw = "\n".join(html_chunks)
+    plain_excerpt = _html.unescape(strip_html_tags("\n".join(prose_chunks))).strip()
+    extracted_excerpt = plain_excerpt[:12000]
+
     res = run_preflight_audit(
         title=extracted_title,
+        author_name=extracted_author,
         manuscript_text=manuscript_raw,
         mode=mode,
         lang=lang,
         **kwargs,
     )
+    res.extracted_meta = {
+        "title": extracted_title,
+        "author_name": extracted_author,
+        "language": extracted_lang,
+    }
+    res.extracted_excerpt = extracted_excerpt
+
     if extra_findings:
         container_errors = [asdict(f) for f in extra_findings if f.severity == "error"]
         container_warnings = [asdict(f) for f in extra_findings if f.severity == "warning"]
@@ -1204,10 +1516,16 @@ def main() -> int:
         import base64
         import binascii
 
-        try:
-            raw_bytes = base64.b64decode(epub_b64, validate=False)
-        except (binascii.Error, ValueError):
-            raw_bytes = b""
+        b64_str = str(epub_b64).strip()
+        if "," in b64_str and b64_str.startswith("data:"):
+            b64_str = b64_str.split(",", 1)[1].strip()
+        if len(b64_str) > 21 * 1024 * 1024:
+            raw_bytes = b"\x00" * (MAX_EPUB_ZIP_BYTES + 1)
+        else:
+            try:
+                raw_bytes = base64.b64decode(b64_str, validate=False)
+            except (binascii.Error, ValueError):
+                raw_bytes = b""
 
         res = audit_epub_bytes(
             raw_bytes,

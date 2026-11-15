@@ -3,7 +3,9 @@
  * 遵循 ShipAny 模块规范：不直接处理 HTTP 请求，仅封装数据库事务、积分扣除与 Python 出版引擎编排。
  */
 
-import { and, desc, eq, gte, ne } from 'drizzle-orm';
+import { rm } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { and, desc, eq, gte, inArray, ne } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { envConfigs } from '@/config';
@@ -14,11 +16,16 @@ import {
   kdpPenProfile,
   kdpProject,
 } from '@/config/db/schema';
-import { consume, getBalance, revoke } from '@/modules/credits/service';
+import { consume, revoke } from '@/modules/credits/service';
 import { getCurrentSubscription } from '@/modules/subscriptions/service';
 import { getUuid, md5 } from '@/lib/hash';
+import { sanitizeChapterHtml } from '@/lib/html-sanitizer';
 
-import { KDP_CREDIT_COSTS, KDP_SAFE_CADENCE_DAYS } from './constants';
+import {
+  KDP_COVER_THEMES,
+  KDP_CREDIT_COSTS,
+  KDP_SAFE_CADENCE_DAYS,
+} from './constants';
 import {
   autoSanitizeViaPython,
   executeKdpGuardAudit,
@@ -183,13 +190,17 @@ export async function runAndRecordGuardScan(params: {
       .map((p: any) => p.title);
   }
 
+  const boundedManuscript = params.manuscriptText
+    ? params.manuscriptText.slice(0, 1_500_000)
+    : undefined;
+
   const audit: GuardAuditResponse = await executeKdpGuardAudit({
     title: params.title,
     subtitle: params.subtitle,
     description: params.description,
     author_name: params.authorName,
     primary_category: params.primaryCategory,
-    manuscript_text: params.manuscriptText,
+    manuscript_text: boundedManuscript,
     epub_base64: params.epubBase64,
     companion_domain: params.companionDomain,
     other_pen_domains: otherDomains,
@@ -231,8 +242,13 @@ export async function sanitizeTextWithCredits(params: {
   rawText: string;
   mode?: 'ebook' | 'paperback' | 'dual';
 }) {
+  const boundedText = params.rawText.trim().slice(0, 120_000);
+  if (!boundedText) {
+    throw new Error('raw_text is required');
+  }
+
   const preAudit = await executeKdpGuardAudit({
-    manuscript_text: params.rawText,
+    manuscript_text: boundedText,
     mode: params.mode || 'dual',
     check_live_collisions: false,
     enforce_min_words: false,
@@ -256,7 +272,7 @@ export async function sanitizeTextWithCredits(params: {
 
   try {
     const out = await autoSanitizeViaPython({
-      raw_text: params.rawText,
+      raw_text: boundedText,
       findings: preAudit.errors,
     });
     const postAudit = await executeKdpGuardAudit({
@@ -320,19 +336,114 @@ export async function getProjectDetail(userId: string, projectId: string) {
     .from(kdpJob)
     .where(eq(kdpJob.projectId, projectId))
     .orderBy(desc(kdpJob.createdAt))
-    .limit(5);
+    .limit(10);
 
   let penProfile = null;
   if (project.penProfileId) {
     penProfile = await findOwnedPenProfile(userId, project.penProfileId);
   }
 
+  let compiledSnapshot: Record<string, any> | null = null;
+  if (project.compiledSnapshotJson && project.compiledSnapshotJson !== '{}') {
+    try {
+      const parsed = JSON.parse(project.compiledSnapshotJson);
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        Object.keys(parsed).length > 0
+      ) {
+        compiledSnapshot = parsed;
+      }
+    } catch {
+      compiledSnapshot = null;
+    }
+  }
+
   return {
     project,
     chapters,
     latestJob: jobs[0] || null,
+    latestSucceededJob: jobs.find((j: any) => j.status === 'succeeded') || null,
+    compiledSnapshot,
     penProfile,
   };
+}
+
+/**
+ * 安全删除 KDP 项目：
+ * 1. 若存在未过期的活跃 processing 任务，禁止删除（防止 Worker 与删除并发冲突）；
+ * 2. 若存在 queued 或租约已过期的 processing 任务，在同一事务内取消任务并退还已扣积分；
+ * 3. 删除项目记录，并在事务提交后清理磁盘交付产物目录。
+ */
+export async function deleteProjectSafely(userId: string, projectId: string) {
+  const result = await db().transaction(async (tx: any) => {
+    const [project] = await tx
+      .select()
+      .from(kdpProject)
+      .where(and(eq(kdpProject.id, projectId), eq(kdpProject.userId, userId)))
+      .limit(1);
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    const jobs = await tx
+      .select()
+      .from(kdpJob)
+      .where(eq(kdpJob.projectId, projectId));
+
+    const nowMs = Date.now();
+    for (const job of jobs) {
+      if (job.status === 'processing') {
+        const leaseMs = job.leaseUntil ? new Date(job.leaseUntil).getTime() : 0;
+        if (!leaseMs || leaseMs > nowMs) {
+          throw new Error(
+            'PROJECT_GENERATING_CANNOT_DELETE: Cannot delete project while Worker is actively generating it.'
+          );
+        }
+      }
+    }
+
+    let refundedCredits = 0;
+    for (const job of jobs) {
+      if (job.status !== 'queued' && job.status !== 'processing') continue;
+      const [canceled] = await tx
+        .update(kdpJob)
+        .set({
+          status: 'canceled',
+          error: 'Canceled when project was deleted',
+          finishedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(kdpJob.id, job.id),
+            inArray(kdpJob.status, ['queued', 'processing'])
+          )
+        )
+        .returning();
+
+      if (canceled && canceled.creditId) {
+        const revoked = await revoke(canceled.creditId, tx);
+        if (revoked) {
+          refundedCredits += canceled.costCredits || 0;
+        }
+      }
+    }
+
+    await tx
+      .delete(kdpProject)
+      .where(and(eq(kdpProject.id, projectId), eq(kdpProject.userId, userId)));
+
+    return { deleted: true, projectId, refundedCredits };
+  });
+
+  // 事务提交后再清理产物目录（避免回滚时误删已有文件）
+  await rm(resolve(getArtifactsRoot(), projectId), {
+    recursive: true,
+    force: true,
+  }).catch(() => {});
+
+  return result;
 }
 
 export async function createProjectAndOutline(params: {
@@ -503,13 +614,14 @@ export async function generateFirstChapterFreePreview(
     target_words: 1550,
   });
 
-  const plain = out.content_html.replace(/<[^>]+>/g, ' ').trim();
+  const safeHtml = sanitizeChapterHtml(out.content_html);
+  const plain = safeHtml.replace(/<[^>]+>/g, ' ').trim();
   const wordCount = plain ? plain.split(/\s+/).length : 0;
 
   await db()
     .update(kdpChapter)
     .set({
-      contentHtml: out.content_html,
+      contentHtml: safeHtml,
       wordCount,
       status: 'previewed',
       updatedAt: new Date(),
@@ -529,15 +641,33 @@ export async function generateFirstChapterFreePreview(
 
   return {
     chapterId: targetChapter.id,
-    contentHtml: out.content_html,
+    contentHtml: safeHtml,
     wordCount,
     reused: false,
   };
 }
 
-export async function enqueueFullBookGeneration(
+function isUniqueJobConstraintError(error: any): boolean {
+  const code = error?.code || error?.cause?.code || '';
+  if (
+    code === '23505' ||
+    code === 'SQLITE_CONSTRAINT' ||
+    code === 'SQLITE_CONSTRAINT_UNIQUE'
+  ) {
+    return true;
+  }
+  const message = String(error?.message || error?.cause?.message || '');
+  return (
+    message.includes('uidx_kdp_job_active_project') ||
+    message.includes('UNIQUE constraint failed') ||
+    message.includes('duplicate key value obeys unique constraint')
+  );
+}
+
+async function enqueueBookJob(
   userId: string,
-  projectId: string
+  projectId: string,
+  jobType: 'generate_book' | 'recompile_bundle'
 ) {
   const detail = await getProjectDetail(userId, projectId);
   if (!detail) throw new Error('Project not found');
@@ -548,13 +678,24 @@ export async function enqueueFullBookGeneration(
     throw new Error('A generation job is already in progress for this project');
   }
 
-  const cost = KDP_CREDIT_COSTS.GENERATE_FULL_BOOK_BUNDLE;
-  const balance = await getBalance(userId);
-  if (balance < cost) {
-    throw new Error(
-      `INSUFFICIENT_CREDITS: Generating full 18k+ word dual-format EPUB + Print PDF bundle requires ${cost} credits (your balance: ${balance}).`
-    );
+  // 快速重打包（10 积分）严禁在尚未产出全书正文时调用，防止绕过 100 积分全书生成费用
+  if (jobType === 'recompile_bundle') {
+    const hasFullManuscript =
+      detail.chapters.length > 0 &&
+      detail.chapters.every(
+        (ch: any) => (ch.contentHtml || '').trim().length > 0
+      );
+    if (!hasFullManuscript) {
+      throw new Error(
+        'Cannot quick-recompile before the full manuscript has been generated. Run Full Book Generation first.'
+      );
+    }
   }
+
+  const cost =
+    jobType === 'recompile_bundle'
+      ? KDP_CREDIT_COSTS.RECOMPILE_BUNDLE
+      : KDP_CREDIT_COSTS.GENERATE_FULL_BOOK_BUNDLE;
 
   // Publishing Studio 订阅用户享有最高优先渲染权重
   const activeSub = await getCurrentSubscription(userId);
@@ -562,52 +703,103 @@ export async function enqueueFullBookGeneration(
     `${activeSub?.productId || ''} ${activeSub?.planName || ''}`.toLowerCase();
   const queuePriority = subTag.includes('studio') ? 100 : 0;
 
-  return db().transaction(async (tx: any) => {
-    const consumeRes = await consume({
-      userId,
-      credits: cost,
-      scene: 'kdp_full_book',
-      description: `Compile Dual-Format KDP Bundle: ${detail.project.title}`,
-      tx,
-    });
-    if (!consumeRes.success) {
-      throw new Error('INSUFFICIENT_CREDITS');
-    }
+  try {
+    return await db().transaction(async (tx: any) => {
+      // 1. 先原子抢占项目队列锁，防止并发请求重复扣分入队
+      const [claimedProject] = await tx
+        .update(kdpProject)
+        .set({
+          status: 'queued',
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(kdpProject.id, projectId),
+            eq(kdpProject.userId, userId),
+            ne(kdpProject.status, 'queued'),
+            ne(kdpProject.status, 'generating')
+          )
+        )
+        .returning();
 
-    const jobId = getUuid();
-    const [job] = await tx
-      .insert(kdpJob)
-      .values({
-        id: jobId,
-        projectId,
+      if (!claimedProject) {
+        throw new Error(
+          'A generation job is already in progress for this project'
+        );
+      }
+
+      // 2. 在同一事务内扣除积分（余额不足时事务自动回滚项目状态）
+      const consumeRes = await consume({
         userId,
-        jobType: 'generate_book',
-        status: 'queued',
-        progressPct: 0,
-        currentStep: 'queued_for_worker',
-        costCredits: cost,
-        creditId: consumeRes.consumedCredit?.id || '',
-        payloadJson: JSON.stringify({
-          priority: queuePriority,
-          coverTheme: detail.project.coverTheme,
-          trimSize: detail.project.trimSize,
-          targetPageCount: detail.project.targetPageCount,
-          paperType: detail.project.paperType,
-        }),
-      })
-      .returning();
+        credits: cost,
+        scene:
+          jobType === 'recompile_bundle' ? 'kdp_recompile' : 'kdp_full_book',
+        description:
+          jobType === 'recompile_bundle'
+            ? `Recompile KDP Bundle: ${detail.project.title}`
+            : `Compile Dual-Format KDP Bundle: ${detail.project.title}`,
+        tx,
+      });
+      if (!consumeRes.success) {
+        const currentBalance = consumeRes.balance ?? 0;
+        throw new Error(
+          `INSUFFICIENT_CREDITS: Generating full 18k+ word dual-format EPUB + Print PDF bundle requires ${cost} credits (your balance: ${currentBalance}).`
+        );
+      }
 
-    await tx
-      .update(kdpProject)
-      .set({
-        status: 'queued',
-        updatedAt: new Date(),
-      })
-      .where(eq(kdpProject.id, projectId));
+      // 3. 写入任务记录（受数据库 partial unique index uidx_kdp_job_active_project 兜底）
+      const jobId = getUuid();
+      const [job] = await tx
+        .insert(kdpJob)
+        .values({
+          id: jobId,
+          projectId,
+          userId,
+          jobType,
+          status: 'queued',
+          progressPct: 0,
+          currentStep: 'queued_for_worker',
+          costCredits: cost,
+          creditId: consumeRes.consumedCredit?.id || '',
+          payloadJson: JSON.stringify({
+            priority: queuePriority,
+            coverTheme: detail.project.coverTheme,
+            trimSize: detail.project.trimSize,
+            targetPageCount: detail.project.targetPageCount,
+            paperType: detail.project.paperType,
+          }),
+        })
+        .returning();
 
-    return job;
-  });
+      return job;
+    });
+  } catch (err) {
+    if (isUniqueJobConstraintError(err)) {
+      throw new Error(
+        'A generation job is already in progress for this project'
+      );
+    }
+    throw err;
+  }
 }
+
+export async function enqueueFullBookGeneration(
+  userId: string,
+  projectId: string
+) {
+  return enqueueBookJob(userId, projectId, 'generate_book');
+}
+
+export async function enqueueBundleRecompile(
+  userId: string,
+  projectId: string
+) {
+  return enqueueBookJob(userId, projectId, 'recompile_bundle');
+}
+
+const ALLOWED_TRIM_SIZES = new Set(['6x9', '5.5x8.5', '8.5x11']);
+const ALLOWED_PAPER_TYPES = new Set(['cream', 'white']);
+const ALLOWED_COVER_THEMES = new Set<string>(KDP_COVER_THEMES.map((t) => t.id));
 
 export async function updateProjectSettings(
   userId: string,
@@ -631,8 +823,40 @@ export async function updateProjectSettings(
     .limit(1);
   if (!existing) throw new Error('Project not found');
 
-  // 严禁跨用户绑定或读取他人 penProfileId（IDOR 防护）
+  if (existing.status === 'queued' || existing.status === 'generating') {
+    throw new Error(
+      'Cannot modify project settings while a build job is queued or running'
+    );
+  }
+
   const nextPatch = { ...patch };
+  if (
+    nextPatch.trimSize !== undefined &&
+    !ALLOWED_TRIM_SIZES.has(nextPatch.trimSize)
+  ) {
+    throw new Error('Invalid trim size');
+  }
+  if (
+    nextPatch.paperType !== undefined &&
+    !ALLOWED_PAPER_TYPES.has(nextPatch.paperType)
+  ) {
+    throw new Error('Invalid paper type');
+  }
+  if (
+    nextPatch.coverTheme !== undefined &&
+    !ALLOWED_COVER_THEMES.has(nextPatch.coverTheme)
+  ) {
+    throw new Error('Invalid cover theme');
+  }
+  if (nextPatch.targetPageCount !== undefined) {
+    const pages = Math.round(Number(nextPatch.targetPageCount));
+    if (!Number.isFinite(pages) || pages < 40 || pages > 600) {
+      throw new Error('Target page count must be between 40 and 600');
+    }
+    nextPatch.targetPageCount = pages;
+  }
+
+  // 严禁跨用户绑定或读取他人 penProfileId（IDOR 防护）
   if (nextPatch.penProfileId !== undefined) {
     const cleanProfileId =
       typeof nextPatch.penProfileId === 'string'

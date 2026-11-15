@@ -23,6 +23,8 @@ import qrcode
 from lxml import etree
 from PIL import Image
 
+from html_sanitizer import sanitize_chapter_html
+
 
 def make_rgb_qr_png(target_url: str, size_px: int = 330) -> bytes:
     """生成 8-bit RGB 印刷级伴读二维码字节流，杜绝 1-bit 位图卡死 Kindle 95%。"""
@@ -54,8 +56,8 @@ def _normalize_heading_text(text: str) -> str:
 
 
 def prepare_chapter_body_html(body_html: str, chapter_title: str) -> str:
-    """移除正文开头与章标题重复的 h1/h2，并统一注入单个标准 h1 章标题。"""
-    cleaned = (body_html or "").strip()
+    """先按白名单净化潜在脚本/事件属性，再移除重复 h1/h2 并注入唯一标准 h1 章标题。"""
+    cleaned = sanitize_chapter_html(body_html or "").strip()
     target_norm = _normalize_heading_text(chapter_title)
     leading_heading = re.match(r"^\s*<(h[12])\b[^>]*>(.*?)</\1>\s*", cleaned, flags=re.IGNORECASE | re.DOTALL)
     if leading_heading:

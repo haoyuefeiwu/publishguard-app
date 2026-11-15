@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import {
@@ -278,7 +278,23 @@ export async function handleWebhook(params: {
 
 // --- Checkout Success: update order + create subscription + grant credits ---
 
-async function handleCheckoutSuccess(session: any, provider: string) {
+function isUniqueConstraintError(error: any): boolean {
+  const code = error?.code || error?.cause?.code || '';
+  if (
+    code === '23505' ||
+    code === 'SQLITE_CONSTRAINT' ||
+    code === 'SQLITE_CONSTRAINT_UNIQUE'
+  ) {
+    return true;
+  }
+  const message = String(error?.message || error?.cause?.message || '');
+  return (
+    message.includes('duplicate key value obeys unique constraint') ||
+    message.includes('UNIQUE constraint failed')
+  );
+}
+
+export async function handleCheckoutSuccess(session: any, provider: string) {
   // Different providers expose the session identifier under different keys.
   // We try the common shapes; for Alipay the natural key is out_trade_no
   // (which equals our orderNo and the value we stored in paymentSessionId).
@@ -291,7 +307,7 @@ async function handleCheckoutSuccess(session: any, provider: string) {
     '';
   if (!sessionId) return;
 
-  // Find order by session ID
+  // 按支付会话查找订单
   const [existingOrder] = await db()
     .select()
     .from(order)
@@ -300,7 +316,7 @@ async function handleCheckoutSuccess(session: any, provider: string) {
 
   if (!existingOrder) return;
 
-  // Idempotency: skip if already paid
+  // 快速幂等拦截
   if (existingOrder.status === OrderStatus.PAID) return;
   if (
     existingOrder.status !== OrderStatus.CREATED &&
@@ -312,7 +328,10 @@ async function handleCheckoutSuccess(session: any, provider: string) {
   const subscriptionInfo = session.subscriptionInfo;
 
   if (session.paymentStatus === PaymentStatus.SUCCESS) {
-    // Prepare order update
+    const subNo =
+      subscriptionInfo && session.subscriptionId ? getSnowId() : null;
+
+    // 准备原子状态迁移数据，先占单再写订阅和积分
     const orderUpdate: Record<string, any> = {
       status: OrderStatus.PAID,
       paymentResult: JSON.stringify(session.paymentResult),
@@ -329,80 +348,95 @@ async function handleCheckoutSuccess(session: any, provider: string) {
       discountAmount: paymentInfo?.discountAmount || null,
     };
 
-    // Atomically update order + create subscription + grant credits
-    await db().transaction(async (tx: any) => {
-      // 1. Create subscription if applicable
-      if (subscriptionInfo && session.subscriptionId) {
-        const subNo = getSnowId();
-        const newSub: any = {
-          id: getUuid(),
-          subscriptionNo: subNo,
-          userId: existingOrder.userId,
-          userEmail:
-            existingOrder.userEmail || existingOrder.paymentEmail || '',
-          status: subscriptionInfo.status || SubscriptionStatus.ACTIVE,
-          paymentProvider: provider,
-          subscriptionId: session.subscriptionId,
-          subscriptionResult: JSON.stringify(session.subscriptionResult),
-          productId: existingOrder.productId,
-          description: subscriptionInfo.description || 'Subscription Created',
-          amount: subscriptionInfo.amount,
-          currency: subscriptionInfo.currency,
-          interval: subscriptionInfo.interval,
-          intervalCount: subscriptionInfo.intervalCount,
-          trialPeriodDays: subscriptionInfo.trialPeriodDays,
-          currentPeriodStart: subscriptionInfo.currentPeriodStart,
-          currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
-          billingUrl: subscriptionInfo.billingUrl,
-          planName: existingOrder.planName || existingOrder.productName,
-          productName: existingOrder.productName,
-          creditsAmount: existingOrder.creditsAmount,
-          creditsValidDays: existingOrder.creditsValidDays,
-          paymentProductId: existingOrder.paymentProductId,
-          paymentUserId: paymentInfo?.paymentUserId,
-        };
-        await tx.insert(subscription).values(newSub);
-        orderUpdate.subscriptionNo = subNo;
-        orderUpdate.subscriptionId = session.subscriptionId;
-        orderUpdate.subscriptionResult = JSON.stringify(
-          session.subscriptionResult
-        );
-      }
+    if (subNo && subscriptionInfo && session.subscriptionId) {
+      orderUpdate.subscriptionNo = subNo;
+      orderUpdate.subscriptionId = session.subscriptionId;
+      orderUpdate.subscriptionResult = JSON.stringify(
+        session.subscriptionResult
+      );
+    }
 
-      // 2. Grant credits if applicable
-      if (existingOrder.creditsAmount && existingOrder.creditsAmount > 0) {
-        const credits = existingOrder.creditsAmount;
-        const expiresAt = calculateCreditExpirationTime({
-          creditsValidDays: existingOrder.creditsValidDays || 0,
-          currentPeriodEnd: subscriptionInfo?.currentPeriodEnd,
-        });
+    try {
+      await db().transaction(async (tx: any) => {
+        // 1. 仅当订单处于 created/pending 时原子转为 paid，并发重放仅有一个胜出
+        const [claimedOrder] = await tx
+          .update(order)
+          .set(orderUpdate)
+          .where(
+            and(
+              eq(order.id, existingOrder.id),
+              inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING]),
+              isNull(order.deletedAt)
+            )
+          )
+          .returning();
 
-        await tx.insert(credit).values({
-          id: getUuid(),
-          userId: existingOrder.userId,
-          userEmail: existingOrder.userEmail || '',
-          orderNo: existingOrder.orderNo,
-          subscriptionNo: orderUpdate.subscriptionNo || '',
-          transactionNo: getSnowId(),
-          transactionType: 'grant',
-          transactionScene:
-            existingOrder.paymentType === 'subscription'
-              ? 'subscription'
-              : 'payment',
-          credits,
-          remainingCredits: credits,
-          description: 'Grant credit',
-          expiresAt,
-          status: 'active',
-        });
-      }
+        if (!claimedOrder) return;
 
-      // 3. Update order
-      await tx
-        .update(order)
-        .set(orderUpdate)
-        .where(eq(order.id, existingOrder.id));
-    });
+        // 2. 创建订阅记录（受 uidx_subscription_provider_id 唯一索引兜底）
+        if (subNo && subscriptionInfo && session.subscriptionId) {
+          const newSub: any = {
+            id: getUuid(),
+            subscriptionNo: subNo,
+            userId: claimedOrder.userId,
+            userEmail:
+              claimedOrder.userEmail || claimedOrder.paymentEmail || '',
+            status: subscriptionInfo.status || SubscriptionStatus.ACTIVE,
+            paymentProvider: provider,
+            subscriptionId: session.subscriptionId,
+            subscriptionResult: JSON.stringify(session.subscriptionResult),
+            productId: claimedOrder.productId,
+            description: subscriptionInfo.description || 'Subscription Created',
+            amount: subscriptionInfo.amount,
+            currency: subscriptionInfo.currency,
+            interval: subscriptionInfo.interval,
+            intervalCount: subscriptionInfo.intervalCount,
+            trialPeriodDays: subscriptionInfo.trialPeriodDays,
+            currentPeriodStart: subscriptionInfo.currentPeriodStart,
+            currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
+            billingUrl: subscriptionInfo.billingUrl,
+            planName: claimedOrder.planName || claimedOrder.productName,
+            productName: claimedOrder.productName,
+            creditsAmount: claimedOrder.creditsAmount,
+            creditsValidDays: claimedOrder.creditsValidDays,
+            paymentProductId: claimedOrder.paymentProductId,
+            paymentUserId: paymentInfo?.paymentUserId,
+          };
+          await tx.insert(subscription).values(newSub);
+        }
+
+        // 3. 发放订单对应积分（受 uidx_credit_order_grant 唯一索引兜底）
+        if (claimedOrder.creditsAmount && claimedOrder.creditsAmount > 0) {
+          const credits = claimedOrder.creditsAmount;
+          const expiresAt = calculateCreditExpirationTime({
+            creditsValidDays: claimedOrder.creditsValidDays || 0,
+            currentPeriodEnd: subscriptionInfo?.currentPeriodEnd,
+          });
+
+          await tx.insert(credit).values({
+            id: getUuid(),
+            userId: claimedOrder.userId,
+            userEmail: claimedOrder.userEmail || '',
+            orderNo: claimedOrder.orderNo,
+            subscriptionNo: subNo || '',
+            transactionNo: getSnowId(),
+            transactionType: 'grant',
+            transactionScene:
+              claimedOrder.paymentType === 'subscription'
+                ? 'subscription'
+                : 'payment',
+            credits,
+            remainingCredits: credits,
+            description: 'Grant credit',
+            expiresAt,
+            status: 'active',
+          });
+        }
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) return;
+      throw error;
+    }
   } else if (
     session.paymentStatus === PaymentStatus.FAILED ||
     session.paymentStatus === PaymentStatus.CANCELED
@@ -413,7 +447,13 @@ async function handleCheckoutSuccess(session: any, provider: string) {
         status: OrderStatus.FAILED,
         paymentResult: JSON.stringify(session.paymentResult),
       })
-      .where(eq(order.id, existingOrder.id));
+      .where(
+        and(
+          eq(order.id, existingOrder.id),
+          inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING]),
+          isNull(order.deletedAt)
+        )
+      );
   }
 }
 
@@ -441,93 +481,99 @@ export async function handleSubscriptionRenewal(
   if (session.paymentStatus !== PaymentStatus.SUCCESS) return;
 
   const paymentInfo = session.paymentInfo;
-
-  // Idempotency: drop duplicate renewals for the same provider transaction.
-  if (paymentInfo?.transactionId) {
-    const [dup] = await db()
-      .select({ id: order.id })
-      .from(order)
-      .where(
-        and(
-          eq(order.transactionId, paymentInfo.transactionId),
-          eq(order.paymentProvider, provider)
-        )
-      )
-      .limit(1);
-    if (dup) return;
-  }
-
+  const dedupTxId =
+    paymentInfo?.transactionId || paymentInfo?.invoiceId || null;
   const renewalOrderNo = getSnowId();
 
-  await db().transaction(async (tx: any) => {
-    // 1. Update subscription period
-    await tx
-      .update(subscription)
-      .set({
-        currentPeriodStart: subscriptionInfo.currentPeriodStart,
-        currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
-      })
-      .where(eq(subscription.subscriptionNo, existingSub.subscriptionNo));
+  try {
+    await db().transaction(async (tx: any) => {
+      // 1. 事务内校验重放，并发竞争时由 uidx_order_transaction_provider 唯一索引兜底
+      if (dedupTxId) {
+        const [dup] = await tx
+          .select({ id: order.id })
+          .from(order)
+          .where(
+            and(
+              eq(order.transactionId, dedupTxId),
+              eq(order.paymentProvider, provider)
+            )
+          )
+          .limit(1);
+        if (dup) return;
+      }
 
-    // 2. Create renewal order
-    await tx.insert(order).values({
-      id: getUuid(),
-      orderNo: renewalOrderNo,
-      userId: existingSub.userId,
-      userEmail: existingSub.userEmail || '',
-      status: OrderStatus.PAID,
-      amount: existingSub.amount,
-      currency: existingSub.currency,
-      productId: existingSub.productId || '',
-      paymentType: 'renew',
-      paymentInterval: existingSub.interval || '',
-      paymentProvider: provider,
-      checkoutInfo: '',
-      description: 'Subscription Renewal',
-      productName: existingSub.productName || '',
-      planName: existingSub.planName || '',
-      creditsAmount: existingSub.creditsAmount,
-      creditsValidDays: existingSub.creditsValidDays,
-      paymentProductId: existingSub.paymentProductId || '',
-      paymentResult: JSON.stringify(session.paymentResult),
-      paymentAmount: paymentInfo?.paymentAmount,
-      paymentCurrency: paymentInfo?.paymentCurrency,
-      paymentEmail: paymentInfo?.paymentEmail,
-      paidAt: paymentInfo?.paidAt || new Date(),
-      invoiceId: paymentInfo?.invoiceId,
-      invoiceUrl: paymentInfo?.invoiceUrl,
-      subscriptionNo: existingSub.subscriptionNo,
-      subscriptionId: session.subscriptionId,
-      transactionId: paymentInfo?.transactionId,
-      paymentUserName: paymentInfo?.paymentUserName,
-      paymentUserId: paymentInfo?.paymentUserId,
-    });
-
-    // 3. Grant credits for renewal
-    if (existingSub.creditsAmount && existingSub.creditsAmount > 0) {
-      const credits = existingSub.creditsAmount;
-      const expiresAt = calculateCreditExpirationTime({
-        creditsValidDays: existingSub.creditsValidDays || 0,
-        currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
-      });
-
-      await tx.insert(credit).values({
+      // 2. 先插入续费订单作为唯一去重锚点
+      await tx.insert(order).values({
         id: getUuid(),
+        orderNo: renewalOrderNo,
         userId: existingSub.userId,
         userEmail: existingSub.userEmail || '',
-        orderNo: renewalOrderNo,
+        status: OrderStatus.PAID,
+        amount: existingSub.amount!,
+        currency: existingSub.currency!,
+        productId: existingSub.productId || '',
+        paymentType: 'renew',
+        paymentInterval: existingSub.interval || '',
+        paymentProvider: provider,
+        checkoutInfo: '',
+        description: 'Subscription Renewal',
+        productName: existingSub.productName || '',
+        planName: existingSub.planName || '',
+        creditsAmount: existingSub.creditsAmount,
+        creditsValidDays: existingSub.creditsValidDays,
+        paymentProductId: existingSub.paymentProductId || '',
+        paymentResult: JSON.stringify(session.paymentResult),
+        paymentAmount: paymentInfo?.paymentAmount,
+        paymentCurrency: paymentInfo?.paymentCurrency,
+        paymentEmail: paymentInfo?.paymentEmail,
+        paidAt: paymentInfo?.paidAt || new Date(),
+        invoiceId: paymentInfo?.invoiceId,
+        invoiceUrl: paymentInfo?.invoiceUrl,
         subscriptionNo: existingSub.subscriptionNo,
-        transactionNo: getSnowId(),
-        transactionType: 'grant',
-        transactionScene: 'renewal',
-        credits,
-        remainingCredits: credits,
-        description: 'Grant credit',
-        expiresAt,
-        status: 'active',
+        subscriptionId: session.subscriptionId,
+        transactionId: dedupTxId,
+        paymentUserName: paymentInfo?.paymentUserName,
+        paymentUserId: paymentInfo?.paymentUserId,
       });
-    }
-  });
+
+      // 3. 更新订阅周期
+      await tx
+        .update(subscription)
+        .set({
+          currentPeriodStart: subscriptionInfo.currentPeriodStart,
+          currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
+        })
+        .where(eq(subscription.subscriptionNo, existingSub.subscriptionNo));
+
+      // 4. 发放续费积分
+      if (existingSub.creditsAmount && existingSub.creditsAmount > 0) {
+        const credits = existingSub.creditsAmount;
+        const expiresAt = calculateCreditExpirationTime({
+          creditsValidDays: existingSub.creditsValidDays || 0,
+          currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
+        });
+
+        await tx.insert(credit).values({
+          id: getUuid(),
+          userId: existingSub.userId,
+          userEmail: existingSub.userEmail || '',
+          orderNo: renewalOrderNo,
+          subscriptionNo: existingSub.subscriptionNo,
+          transactionNo: getSnowId(),
+          transactionType: 'grant',
+          transactionScene: 'renewal',
+          credits,
+          remainingCredits: credits,
+          description: 'Grant credit',
+          expiresAt,
+          status: 'active',
+        });
+      }
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) return;
+    throw error;
+  }
 }
 
 // --- Subscription Updated ---

@@ -63,17 +63,36 @@ export function getCookieFromCtx(ctx: any, name: string): string | undefined {
   return getCookieFromHeader(cookieHeader, name);
 }
 
+function normalizeIpCandidate(raw: string | undefined): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'unknown') return '';
+  return trimmed.replace(/^\[|\]$/g, '');
+}
+
+/**
+ * 提取客户端真实 IP（抗客户端伪造 X-Forwarded-For 绕过限流）：
+ * 优先读取受反代/CDN 覆盖的 cf-connecting-ip / x-real-ip；
+ * 回退 x-forwarded-for 时取最右侧代理追加的跳点，而非客户端可随意伪造的首个值。
+ */
 export function getClientIpFromCtx(ctx: any): string {
+  const cfIp = normalizeIpCandidate(getHeaderValue(ctx, 'cf-connecting-ip'));
+  if (cfIp) return cfIp;
+
+  const realIp = normalizeIpCandidate(getHeaderValue(ctx, 'x-real-ip'));
+  if (realIp) return realIp;
+
   const forwarded = getHeaderValue(ctx, 'x-forwarded-for');
   if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) return first;
+    const parts = forwarded
+      .split(',')
+      .map((part) => normalizeIpCandidate(part))
+      .filter(Boolean);
+    if (parts.length > 0) {
+      return parts[parts.length - 1];
+    }
   }
-  return (
-    getHeaderValue(ctx, 'cf-connecting-ip') ||
-    getHeaderValue(ctx, 'x-real-ip') ||
-    ''
-  );
+  return '';
 }
 
 export function guessLocaleFromAcceptLanguage(
