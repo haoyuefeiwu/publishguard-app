@@ -66,6 +66,7 @@ export async function POST(req: Request) {
         manuscript_text: String(form.get('manuscript_text') || ''),
         companion_domain: String(form.get('companion_domain') || ''),
         mode: String(form.get('mode') || 'dual'),
+        lang: String(form.get('lang') || 'en'),
       };
     } else {
       payload = await req.json().catch(() => ({}));
@@ -83,6 +84,12 @@ export async function POST(req: Request) {
       );
     }
 
+    const lang = String(payload.lang || '')
+      .toLowerCase()
+      .startsWith('zh')
+      ? 'zh'
+      : 'en';
+
     const { report, audit } = await runAndRecordGuardScan({
       userId: session?.user?.id || null,
       projectId: payload.project_id || null,
@@ -96,11 +103,16 @@ export async function POST(req: Request) {
       epubBase64: epubBase64 || payload.epub_base64 || undefined,
       companionDomain: payload.companion_domain,
       mode: payload.mode || 'dual',
+      lang,
       checkLiveCollisions: payload.check_live_collisions !== false,
     });
 
     return respData({ reportId: report.id, audit });
   } catch (err: any) {
-    return respErr(err?.message || 'KDP Guard audit failed');
+    const rawMsg = String(err?.message || 'KDP Guard audit failed');
+    const safeMsg = /traceback|file\s+["']|\/app\/|\/users\//i.test(rawMsg)
+      ? 'Audit engine failed to process this file. Please verify your .epub container and try again.'
+      : rawMsg;
+    return respErr(safeMsg);
   }
 }

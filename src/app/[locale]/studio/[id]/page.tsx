@@ -12,6 +12,7 @@ import {
   Loader2,
   Lock,
   Rocket,
+  ShieldAlert,
   ShieldCheck,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -296,14 +297,41 @@ export default function StudioProjectDetailPage() {
             )}
 
             {isReady && (
-              <div className="space-y-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-xs">
-                <div className="flex items-center justify-between font-semibold text-emerald-700 dark:text-emerald-300">
+              <div
+                className={cn(
+                  'space-y-3 rounded-xl border p-4 text-xs',
+                  project.guardPassed
+                    ? 'border-emerald-500/40 bg-emerald-500/10'
+                    : 'border-amber-500/50 bg-amber-500/10'
+                )}
+              >
+                <div
+                  className={cn(
+                    'flex items-center justify-between font-semibold',
+                    project.guardPassed
+                      ? 'text-emerald-700 dark:text-emerald-300'
+                      : 'text-amber-800 dark:text-amber-300'
+                  )}
+                >
                   <span className="flex items-center gap-1.5">
-                    <ShieldCheck className="size-4" />
-                    26-Rule Pre-Flight Guard Passed ({project.guardScore}/100)
+                    {project.guardPassed ? (
+                      <ShieldCheck className="size-4" />
+                    ) : (
+                      <ShieldAlert className="size-4" />
+                    )}
+                    {project.guardPassed
+                      ? `26-Rule Pre-Flight Guard Passed (${project.guardScore}/100)`
+                      : `Compiled with Guard Alerts (${project.guardScore}/100) — Review Before Upload`}
                   </span>
                   <span>{project.actualWordCount.toLocaleString()} words</span>
                 </div>
+                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                  Deliverables ready: EPUB 3 + {project.trimSize}&quot; Print
+                  PDF ({project.targetPageCount}pp, Spine {spineIn}&quot;, Wrap{' '}
+                  {wrapW}&quot;×{wrapH}&quot;). Open EPUB in Kindle Previewer 3
+                  and inspect Print PDF in Amazon Print Previewer before
+                  publishing.
+                </p>
                 <div className="flex flex-wrap gap-2">
                   <a
                     href={`/api/kdp/projects/${project.id}/download?type=bundle`}
@@ -446,7 +474,7 @@ export default function StudioProjectDetailPage() {
           {[
             ['Book Title', project.title],
             [
-              `Subtitle (${project.subtitle.length}/110 chars)`,
+              `Subtitle (${project.subtitle.length} chars · Combined ${project.title.length + project.subtitle.length}/200)`,
               project.subtitle,
             ],
             [
@@ -459,6 +487,10 @@ export default function StudioProjectDetailPage() {
             ],
             ['7 Backend Keywords', keywords.join(' | ')],
             ['Clean Book Description', meta.back_blurb || ''],
+            [
+              'KDP AI-Generated Content Disclosure (Required)',
+              'Text: AI-generated (entire or edited) · Verify cover asset origin · Confirm in Kindle Previewer 3 & Print Previewer',
+            ],
           ].map(([label, val]) => (
             <div
               key={label}

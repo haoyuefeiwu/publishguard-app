@@ -44,7 +44,8 @@ def test_guard_blocks_high_risk_paperback_and_ebook_patterns() -> None:
     <h2>Day 1 Scorecard</h2>
     <p>How to turn off anxiety and panic attacks with this healing code and get instant relief for insomnia.</p>
     <p>Use coupon WELCOME15 for 15% OFF at https://luminaquartz.com/audio</p>
-    <a href="https://luminaquartz.com/audio">Click here</a>
+    <a href="https://luminaquartz.com/audio">Reader Companion</a>
+    <a href="https://luminaquartz.com/checkout?promo=welcome15">Claim Promo</a>
     """
     res = run_preflight_audit(
         title="The Crystal Code",
@@ -62,8 +63,8 @@ def test_guard_blocks_high_risk_paperback_and_ebook_patterns() -> None:
     )
     assert res.passed is False
     codes = {e["code"] for e in res.errors}
+    warning_codes = {w["code"] for w in res.warnings}
     expected_codes = {
-        "SUBTITLE_OVER_110",
         "SUBTITLE_MULTI_COLON",
         "SUBTITLE_FORMULAIC_TEMPLATE",
         "NON_HUMAN_AUTHOR_NAME",
@@ -75,11 +76,13 @@ def test_guard_blocks_high_risk_paperback_and_ebook_patterns() -> None:
         "IMPERSONATION_IMPRINT",
         "WORKBOOK_TRIGGER_LEXICON",
         "RECTANGULAR_BOX_CSS",
-        "EBOOK_EXTERNAL_HYPERLINK",
+        "EBOOK_PROMO_HYPERLINK",
         "THIN_CONTENT_UNDER_15K",
         "TITLE_COLLISION_EXACT",
     }
     assert expected_codes.issubset(codes), f"缺少预期拦截项: {expected_codes - codes}"
+    assert "SUBTITLE_OVER_110" in warning_codes
+    assert "EBOOK_EXTERNAL_HYPERLINK" in warning_codes
 
 
 def test_guard_passes_clean_16k_monograph() -> None:
@@ -247,3 +250,56 @@ def test_chrome_headless_pdf_and_bundle_packaging(tmp_path: Path) -> None:
     assert (tmp_path / res["interior_pdf"]).exists()
     assert (tmp_path / res["cover_wrap_pdf"]).exists()
     assert (tmp_path / res["cover_front_jpg"]).exists()
+    checklist = (tmp_path / res["checklist_json"]).read_text(encoding="utf-8")
+    assert "ai_generated_disclosure" in checklist
+
+
+def test_guard_english_default_title_200_limit_and_rule_tiers() -> None:
+    """默认输出纯英文报告、区分官方规格与风险建议，并准确拦截主副标题合计 ≥200 字符。"""
+    # 1. 主标题 + 副标题合计 >= 200 字符 -> 官方规格硬阻断
+    over_200 = run_preflight_audit(
+        title="A" * 95,
+        subtitle="B" * 110,
+        author_name="Evelyn Vance",
+        primary_category="Self-Help",
+        check_live_collisions=False,
+        enforce_min_words=False,
+    )
+    assert over_200.passed is False
+    err_codes = {e["code"]: e for e in over_200.errors}
+    assert "TITLE_SUBTITLE_COMBINED_OVER_200" in err_codes
+    assert err_codes["TITLE_SUBTITLE_COMBINED_OVER_200"]["rule_tier"] == "platform_spec"
+    assert not any("\u4e00" <= ch <= "\u9fff" for ch in err_codes["TITLE_SUBTITLE_COMBINED_OVER_200"]["message"])
+
+    # 2. 单独副标题 115 字符但主副合计 < 200 字符 -> 仅警告提醒，不硬阻断
+    sub_115 = run_preflight_audit(
+        title="Quiet Structure",
+        subtitle="B" * 115,
+        author_name="Evelyn Vance",
+        primary_category="Self-Help",
+        check_live_collisions=False,
+        enforce_min_words=False,
+    )
+    assert sub_115.passed is True
+    warn_codes = {w["code"]: w for w in sub_115.warnings}
+    assert "SUBTITLE_OVER_110" in warn_codes
+    assert warn_codes["SUBTITLE_OVER_110"]["rule_tier"] == "risk_advisory"
+    assert len(sub_115.checks_not_run) >= 1
+
+
+def test_epub_rejects_corrupt_and_hollow_mimetype_archives() -> None:
+    """损坏字节或仅含错误 mimetype、无正文章节的空壳 ZIP 不得放行。"""
+    import io
+
+    corrupt = audit_epub_bytes(b"not-a-valid-epub-payload", check_live_collisions=False)
+    assert corrupt.passed is False
+    assert corrupt.score == 0
+    assert {e["code"] for e in corrupt.errors} == {"INVALID_EPUB_ARCHIVE"}
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_STORED) as zf:
+        zf.writestr("mimetype", "text/plain")
+    hollow = audit_epub_bytes(buf.getvalue(), check_live_collisions=False)
+    assert hollow.passed is False
+    codes = {e["code"] for e in hollow.errors}
+    assert {"EPUB_INVALID_MIMETYPE", "EPUB_MISSING_OPF", "EPUB_NO_CONTENT"}.issubset(codes)

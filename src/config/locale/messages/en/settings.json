@@ -7,8 +7,8 @@
     "studio_desc": "Generate a 20,000-word manuscript, cover, EPUB 3 & 6x9 PDF.",
     "guard_title": "26-Rule Pre-Flight Guard",
     "guard_desc": "Scan titles, metadata, and manuscripts for ban risks.",
-    "profiles_title": "Pen Profile Firewall",
-    "profiles_desc": "Isolate domains and author identities across pen names."
+    "profiles_title": "Pen Name Organizer",
+    "profiles_desc": "Organize domains, cadence, and imprints cleanly per pen name."
   },
   "nav": {
     "studio": "Book Studio",

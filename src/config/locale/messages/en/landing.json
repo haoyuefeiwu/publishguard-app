@@ -7,26 +7,26 @@
     "blog": "Blog"
   },
   "hero": {
-    "badge": "26-Rule Amazon KDP Compliance Firewall + Dual-Format Studio",
-    "headline": "Publish KDP books that pass review and actually sell.",
-    "subheadline": "Other AI book tools generate generic thin prose that gets your KDP account suspended. PublishGuard runs 26 battle-tested compliance checks, checks Apple Books & OpenLibrary collisions, writes 18,000+ word monographs, and compiles print-ready 6×9 PDFs + Kindle EPUB 3.",
+    "badge": "26-Rule Amazon KDP Pre-Flight Compliance + Dual-Format Studio",
+    "headline": "Check your book before you upload to Amazon KDP.",
+    "subheadline": "Catch KDP formatting, metadata, and content policy risks before hitting Publish. Scan existing manuscripts free, verify title collisions across Apple Books & OpenLibrary, or build 18,000+ word editions with Kindle EPUB 3 & 6×9 print PDFs.",
     "cta": "Start Your Book Free",
     "secondary": "Run Free 26-Rule Audit"
   },
   "features": {
-    "title": "Built to protect your KDP account — not just spit out AI text",
-    "description": "Every guardrail comes from real-world KDP review outcomes, preventing \"Disappointing Customer Experience\" blocks before you ever click Publish.",
+    "title": "Built to protect your KDP uploads — not just generate AI text",
+    "description": "Every guardrail comes from practical KDP review and formatting requirements, catching quality and metadata issues before you click Publish.",
     "firewall": {
-      "title": "26-Rule Ban Firewall",
-      "description": "Scans for DSM-5 clinical/medical claims, promo/coupon words, fake publisher imprints, workbook scorecard triggers, and rectangular box CSS that get paperbacks rejected."
+      "title": "26-Rule Pre-Flight Guard",
+      "description": "Scans for DSM-5 clinical/medical wording, promo/coupon codes, fake publisher imprints, workbook scorecard triggers, and rectangular box CSS."
     },
     "collision": {
       "title": "Live Title Collision Radar",
       "description": "Queries Apple Books and OpenLibrary in real time so your main title never collides with established bestsellers or triggers Option 1 impersonation flags."
     },
     "isolation": {
-      "title": "Cross-Pen Domain Isolation",
-      "description": "Enforces strict separation between pen names and companion domains plus a 7-day publishing cadence alert to eliminate multi-account linkage."
+      "title": "Pen-Name Brand & Domain Organizer",
+      "description": "Keeps companion domains separated per pen name and tracks a structured 7-day publishing cadence inside a clean single-account workflow."
     },
     "writer": {
       "title": "18,000–22,000 Word Deep Writer",
@@ -55,16 +55,18 @@
     "single_desc": "No subscription required. Complete 1 full book end-to-end.",
     "single_credits": "120 credits (valid 1 year)",
     "pro_name": "Author Pro",
-    "pro_desc": "Built for safe weekly KDP cadence (~3 dual-format books/mo).",
+    "pro_desc": "Built for consistent KDP publishing cadence (~3 dual-format books/mo).",
     "pro_credits": "360 credits / month",
+    "pro_credits_yearly": "4,320 credits / year (full annual grant)",
     "studio_name": "Publishing Studio",
-    "studio_desc": "Multi-pen-name matrix isolation & highest rendering priority.",
+    "studio_desc": "Pen-name brand domain organizer + highest priority PDF render queue.",
     "studio_credits": "1,000 credits / month",
+    "studio_credits_yearly": "12,000 credits / year (full annual grant)",
     "feature_guard_unlimited": "Unlimited 26-rule KDP Guard scans",
     "feature_dual_bundle": "EPUB 3 + 6×9 Print PDF + Full Wrap Cover",
     "feature_four_covers": "All 4 de-homogenized cover architectures",
     "feature_ai_sanitize": "AI one-click compliance sanitization",
-    "feature_pen_isolation": "Cross-pen domain & cadence firewall",
+    "feature_pen_isolation": "Pen-name domain separation & cadence tracker",
     "feature_priority_worker": "Priority Chrome Headless PDF worker"
   },
   "faq": {
@@ -102,7 +104,7 @@
     "button": "Open Book Studio"
   },
   "footer": {
-    "tagline": "Ban-proof Amazon KDP publishing infrastructure.",
+    "tagline": "Pre-upload Amazon KDP compliance & publishing infrastructure.",
     "feature": "Platform",
     "product": "Tools",
     "resources": "Resources",

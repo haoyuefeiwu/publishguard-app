@@ -13,7 +13,7 @@ import {
   Sparkles,
   Wand2,
 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
 import { Link } from '@/core/i18n/navigation';
@@ -25,6 +25,7 @@ interface AuditFinding {
   code: string;
   severity: string;
   rule_ref: string;
+  rule_tier?: 'platform_spec' | 'risk_advisory';
   message: string;
   matched_text: string;
   suggestion: string;
@@ -44,6 +45,7 @@ interface AuditData {
     similar_titles: Array<{ title: string; author: string; source: string }>;
   };
   suggestions: Array<{ original: string; replacement: string }>;
+  checks_not_run?: Array<{ code: string; title: string; reason: string }>;
 }
 
 const RISKY_SAMPLE = {
@@ -62,6 +64,8 @@ const RISKY_SAMPLE = {
 
 export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
   const t = useTranslations('studio.guard');
+  const locale = useLocale();
+  const auditLang = locale.startsWith('zh') ? 'zh' : 'en';
 
   const [mode, setMode] = useState<'dual' | 'ebook' | 'paperback'>('dual');
   const [title, setTitle] = useState('');
@@ -107,6 +111,7 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
         fd.append('primary_category', category);
         fd.append('companion_domain', companionDomain);
         fd.append('mode', mode);
+        fd.append('lang', auditLang);
         res = await fetch('/api/kdp/guard/scan', { method: 'POST', body: fd });
       } else {
         res = await fetch('/api/kdp/guard/scan', {
@@ -121,6 +126,7 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
             manuscript_text: manuscriptText,
             companion_domain: companionDomain,
             mode,
+            lang: auditLang,
           }),
         });
       }
@@ -407,6 +413,31 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
             </div>
           </div>
 
+          {/* 顶部优先修复前三项摘要（最值得立即修改的问题与位置） */}
+          {audit.errors.length > 0 && (
+            <div className="border-border bg-muted/30 space-y-2 rounded-xl border p-4 text-xs">
+              <div className="font-semibold">{t('top_fixes_title')}</div>
+              <ol className="list-decimal space-y-1.5 pl-4">
+                {audit.errors.slice(0, 3).map((topErr, idx) => (
+                  <li key={idx} className="leading-relaxed">
+                    <span className="font-semibold">{topErr.code}</span>
+                    {topErr.matched_text ? (
+                      <>
+                        {' '}
+                        (
+                        <code className="bg-background rounded px-1 py-0.5 text-[11px]">
+                          {topErr.matched_text}
+                        </code>
+                        )
+                      </>
+                    ) : null}
+                    : {topErr.suggestion || topErr.message}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
           {/* 撞车实时结果 */}
           {audit.collisions?.checked && (
             <div className="border-border bg-muted/30 rounded-xl border p-4 text-xs">
@@ -452,10 +483,24 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
                   key={i}
                   className="border-destructive/30 bg-destructive/5 rounded-xl border p-3.5 text-xs"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono font-semibold text-red-700 dark:text-red-300">
-                      [{err.rule_ref}] {err.code}
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(
+                          'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
+                          err.rule_tier === 'platform_spec'
+                            ? 'bg-red-600/15 text-red-700 dark:text-red-300'
+                            : 'bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                        )}
+                      >
+                        {err.rule_tier === 'platform_spec'
+                          ? t('tier_platform_spec')
+                          : t('tier_risk_advisory')}
+                      </span>
+                      <span className="font-mono font-semibold text-red-700 dark:text-red-300">
+                        [{err.rule_ref}] {err.code}
+                      </span>
+                    </div>
                     {err.matched_text && (
                       <code className="bg-background rounded px-1.5 py-0.5 text-[11px]">
                         {err.matched_text}
@@ -485,7 +530,17 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
                   className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs"
                 >
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
-                  <div>
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 uppercase dark:text-amber-300">
+                        {w.rule_tier === 'platform_spec'
+                          ? t('tier_platform_spec')
+                          : t('tier_risk_advisory')}
+                      </span>
+                      <span className="font-mono text-[11px] font-medium">
+                        {w.code}
+                      </span>
+                    </div>
                     <div className="font-medium">{w.message}</div>
                     {w.suggestion && (
                       <div className="text-muted-foreground mt-0.5">
@@ -495,6 +550,23 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* 仍需人工确认与未涵盖的检查说明 */}
+          {audit.checks_not_run && audit.checks_not_run.length > 0 && (
+            <div className="border-border bg-muted/20 space-y-2 rounded-xl border p-4 text-xs">
+              <div className="font-semibold">{t('manual_checks_title')}</div>
+              <ul className="text-muted-foreground space-y-1.5">
+                {audit.checks_not_run.map((item) => (
+                  <li key={item.code}>
+                    <span className="text-foreground font-medium">
+                      {item.title}:
+                    </span>{' '}
+                    {item.reason}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

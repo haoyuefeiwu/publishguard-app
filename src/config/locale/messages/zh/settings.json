@@ -5,15 +5,15 @@
   "quick_actions": {
     "studio_title": "新建 KDP 造书项目",
     "studio_desc": "生成 20,000 词长篇专著、封面、EPUB 3 与 6x9 印刷 PDF。",
-    "guard_title": "26 项零风控体检仪",
+    "guard_title": "26 项 KDP 上架预检仪",
     "guard_desc": "提前扫描书名查重、敏感医疗词与违禁排版隐患。",
-    "profiles_title": "笔名防关联矩阵",
-    "profiles_desc": "按笔名严格隔离官网域名、作者署名与出版社标识。"
+    "profiles_title": "笔名品牌管理",
+    "profiles_desc": "按笔名清晰整理官网域名、作者署名与出版社标识。"
   },
   "nav": {
     "studio": "造书工作台",
-    "guard": "26项防封体检",
-    "profiles": "笔名防关联",
+    "guard": "KDP 合规体检",
+    "profiles": "笔名管理",
     "overview": "概览",
     "profile": "个人资料",
     "billing": "账单",

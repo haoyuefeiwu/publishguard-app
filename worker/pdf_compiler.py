@@ -441,7 +441,7 @@ def compile_paperback_and_bundle(
     wrap_html_path.write_text(wrap_html_str, encoding="utf-8")
     render_html_to_pdf(wrap_html_path, wrap_pdf_path)
 
-    # 3. 保存元数据核对单
+    # 3. 保存元数据核对单（含 AI 生成内容申报提示与官方预览器核验步骤）
     checklist_path = work_dir / "04_KDP_Metadata_Checklist.json"
     checklist_data = metadata_checklist or {}
     checklist_data.update(
@@ -451,6 +451,16 @@ def compile_paperback_and_bundle(
             "wrap_dimensions_in": f"{wrap_dims.total_width} x {wrap_dims.total_height}",
             "paper_type": paper_type,
             "trim_size": trim_size,
+            "ai_generated_disclosure": {
+                "required_by_kdp": True,
+                "text_content": "AI-generated (entire or edited)",
+                "images_or_cover": "AI-generated / None (verify against your cover setup)",
+                "guidance": "Amazon KDP requires declaring AI-generated text, images, or translations during book setup.",
+            },
+            "official_previewer_checks": [
+                "Open 01_Kindle_eBook_Upload.epub in Amazon Kindle Previewer 3 before publishing.",
+                "Inspect 01_Interior_Manuscript_Print.pdf and 03_Paperback_Cover_Wrap.pdf in Amazon KDP Print Previewer.",
+            ],
         }
     )
     checklist_path.write_text(json.dumps(checklist_data, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -56,22 +56,51 @@ export async function runPythonJsonScript<T = any>(
       reject(err);
     });
 
+    function sanitizePythonFailure(
+      scriptName: string,
+      code: number | null,
+      stderr: string
+    ): string {
+      const trimmed = stderr.trim();
+      if (trimmed) {
+        console.error(
+          `[python-bridge] ${scriptName} exited (${code}):`,
+          trimmed
+        );
+      }
+      const lastLine =
+        trimmed
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .pop() || '';
+      if (
+        lastLine &&
+        !/traceback|file\s+["']|\/app\/|\/users\//i.test(trimmed) &&
+        lastLine.length <= 160
+      ) {
+        return lastLine;
+      }
+      return `Audit/engine process (${scriptName}) failed to process the input. Please verify the file format and try again.`;
+    }
+
     proc.on('close', (code) => {
       clearTimeout(timer);
       if (code !== 0) {
-        reject(
-          new Error(
-            stderr.trim() || `Python ${scriptName} exited with code ${code}`
-          )
-        );
+        reject(new Error(sanitizePythonFailure(scriptName, code, stderr)));
         return;
       }
       try {
         resolvePromise(JSON.parse(stdout) as T);
       } catch (parseErr: any) {
+        console.error(
+          `[python-bridge] Invalid JSON from ${scriptName}:`,
+          parseErr?.message,
+          stdout.slice(0, 300)
+        );
         reject(
           new Error(
-            `Invalid JSON from ${scriptName}: ${parseErr?.message} | raw=${stdout.slice(0, 300)}`
+            `PublishGuard engine (${scriptName}) returned an invalid response. Please try again.`
           )
         );
       }
@@ -82,27 +111,23 @@ export async function runPythonJsonScript<T = any>(
   });
 }
 
+export interface GuardAuditFinding {
+  code: string;
+  severity: string;
+  rule_ref: string;
+  rule_tier?: 'platform_spec' | 'risk_advisory';
+  message: string;
+  matched_text: string;
+  suggestion: string;
+}
+
 export interface GuardAuditResponse {
   passed: boolean;
   score: number;
   mode: string;
   word_count: number;
-  errors: Array<{
-    code: string;
-    severity: string;
-    rule_ref: string;
-    message: string;
-    matched_text: string;
-    suggestion: string;
-  }>;
-  warnings: Array<{
-    code: string;
-    severity: string;
-    rule_ref: string;
-    message: string;
-    matched_text: string;
-    suggestion: string;
-  }>;
+  errors: GuardAuditFinding[];
+  warnings: GuardAuditFinding[];
   collisions: {
     checked: boolean;
     sources: string[];
@@ -110,10 +135,11 @@ export interface GuardAuditResponse {
     similar_titles: Array<{ title: string; author: string; source: string }>;
   };
   suggestions: Array<{ original: string; replacement: string }>;
+  checks_not_run?: Array<{ code: string; title: string; reason: string }>;
 }
 
 /**
- * 调用 `kdp_guard_service.py` 运行 26 项零风控物理扫雷与全网撞车查重。
+ * 调用 `kdp_guard_service.py` 运行 26 项上架前物理合规体检与全网撞车查重。
  */
 export async function executeKdpGuardAudit(params: {
   title?: string;
@@ -127,6 +153,7 @@ export async function executeKdpGuardAudit(params: {
   other_pen_domains?: string[];
   existing_pen_titles?: string[];
   mode?: 'ebook' | 'paperback' | 'dual';
+  lang?: 'en' | 'zh';
   check_live_collisions?: boolean;
   enforce_min_words?: boolean;
 }): Promise<GuardAuditResponse> {

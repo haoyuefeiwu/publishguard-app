@@ -1,32 +1,32 @@
 {
   "nav": {
     "studio": "造书工作台",
-    "guard": "免费防封体检",
+    "guard": "免费合规体检",
     "features": "核心壁垒",
     "pricing": "定价方案",
     "blog": "出版专栏"
   },
   "hero": {
-    "badge": "26 项 Amazon KDP 零风控防火墙 + 双轨印刷级出版工坊",
-    "headline": "写出能过亚马逊严审、真正合规上架变现的 KDP 专著。",
-    "subheadline": "市面上普通 AI 写书工具只管吐字、不管封号。PublishGuard 内置实战淬炼的 26 项 KDP 防封扫雷、Apple Books / OpenLibrary 全网撞车雷达、18,000+ 词深度长文引擎与精确算脊的 6×9 印刷级 PDF / Kindle EPUB 3 编译器。",
+    "badge": "Amazon KDP 上架前合规预检 + 双轨印刷级出版工坊",
+    "headline": "写出能通过亚马逊严审、真正合规上架的 KDP 专著。",
+    "subheadline": "普通 AI 写书工具只管吐字、不管格式与政策红线。PublishGuard 内置 26 项 KDP 上架前预检、Apple Books / OpenLibrary 全网撞车雷达、18,000+ 词长文引擎与精确算脊的 6×9 印刷级 PDF / Kindle EPUB 3 编译器。",
     "cta": "免费立项试写一本书",
-    "secondary": "免费运行 26 项防封体检"
+    "secondary": "免费运行 26 项合规体检"
   },
   "features": {
-    "title": "卖的不是普通 AI 文案，而是“活得过亚马逊审核”的出版基础设施",
-    "description": "每一条拦截红线均源自真实 KDP 人工复审与封控日志，在点击 Publish 前物理阻断 \"Disappointing Customer Experience\" 退稿与封号。",
+    "title": "交付可直接上传的合规成书，而不只是零散 AI 草稿",
+    "description": "每一条检查规则均源自真实 KDP 审核与交付排查经验，在点击 Publish 前尽早发现 \"Disappointing Customer Experience\" 退稿与格式返工风险。",
     "firewall": {
-      "title": "26 项 KDP 上架防封防火墙",
-      "description": "精准拦截 DSM-5 临床诊断/根治词、优惠券代码、虚假出版社印记、低内容 Scorecard 触发词，以及诱导平装书误判为打卡表的矩形边框 CSS。"
+      "title": "26 项 KDP 上架前预检扫描",
+      "description": "精准排查 DSM-5 临床诊断/根治词、优惠券代码、虚假出版社印记、低内容 Scorecard 触发词，以及诱导平装书误判为打卡表的矩形边框 CSS。"
     },
     "collision": {
       "title": "全网主书名防撞车雷达",
-      "description": "立项即实时查询 Apple Books 与 OpenLibrary 书库，阻断与成熟畅销书或用户历史笔名撞车，远离 Option 1 仿冒封号风险。"
+      "description": "立项即实时查询 Apple Books 与 OpenLibrary 书库，提示与成熟畅销书或工作区历史书名冲突，降低 Option 1 仿冒退稿风险。"
     },
     "isolation": {
-      "title": "多笔名防连坐隔离矩阵",
-      "description": "物理检测跨笔名复用同一伴读域名的高危关联指纹，并内置 7 天单账号安全发书冷却提醒，彻底告别连带封号。"
+      "title": "笔名品牌与伴读域名管理",
+      "description": "帮助在同一 KDP 账户下清晰管理不同笔名的独立伴读域名，并内置 7 天发书节奏提醒，让品牌运营更有条理。"
     },
     "writer": {
       "title": "18,000–22,000 词长文引擎",
@@ -55,16 +55,18 @@
     "single_desc": "零订阅负担，适合新手完整发布第 1 本合规 KDP 图书。",
     "single_credits": "120 积分（1 年有效）",
     "pro_name": "Author Pro（专业出版人）",
-    "pro_desc": "契合每周 1 本安全发布节奏（每月约 3 本双轨专著）。",
+    "pro_desc": "契合稳定周更发书节奏（每月约 3 本双轨专著）。",
     "pro_credits": "每月 360 积分",
+    "pro_credits_yearly": "每年 4,320 积分（一次性全额发放）",
     "studio_name": "Publishing Studio（工作室版）",
-    "studio_desc": "多笔名防关联矩阵管理 + 最高优先级 PDF 渲染队列。",
+    "studio_desc": "多笔名域名管理 + 最高优先级 PDF 渲染队列。",
     "studio_credits": "每月 1,000 积分",
-    "feature_guard_unlimited": "无限次 26 项 KDP 防封扫雷体检",
+    "studio_credits_yearly": "每年 12,000 积分（一次性全额发放）",
+    "feature_guard_unlimited": "无限次 26 项 KDP 合规预检扫描",
     "feature_dual_bundle": "一键导出 EPUB 3 + 6×9 印刷 PDF + 全展开封面",
     "feature_four_covers": "解锁全部 4 套去同质化专业出版社封面",
     "feature_ai_sanitize": "AI 一键合规洗稿脱敏（高危词原地替换）",
-    "feature_pen_isolation": "跨笔名域名隔离告警与 7 天发布节奏保护",
+    "feature_pen_isolation": "跨笔名伴读域名分离检查与发布节奏提醒",
     "feature_priority_worker": "高优先级 Chrome Headless 排版渲染通道"
   },
   "faq": {
@@ -102,7 +104,7 @@
     "button": "立即进入造书工作台"
   },
   "footer": {
-    "tagline": "亚马逊 KDP 零风控出版基础设施。",
+    "tagline": "亚马逊 KDP 上架前合规预检与出版基础设施。",
     "feature": "核心能力",
     "product": "在线工具",
     "resources": "资源中心",

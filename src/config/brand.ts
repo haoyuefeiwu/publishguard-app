@@ -5,7 +5,7 @@
 export const BRAND_CONFIG = {
   name: process.env.NEXT_PUBLIC_APP_NAME || 'PublishGuard',
   domain: process.env.NEXT_PUBLIC_APP_DOMAIN || 'getpublishguard.com',
-  tagline: 'The Ban-Proof Amazon KDP Publishing & AI Book Studio',
+  tagline: 'Amazon KDP Pre-Flight Compliance & AI Book Studio',
   supportEmail:
     process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@getpublishguard.com',
   defaultLocale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE || 'en',

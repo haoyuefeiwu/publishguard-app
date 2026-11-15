@@ -15,6 +15,7 @@ import {
   kdpProject,
 } from '@/config/db/schema';
 import { consume, getBalance, revoke } from '@/modules/credits/service';
+import { getCurrentSubscription } from '@/modules/subscriptions/service';
 import { getUuid, md5 } from '@/lib/hash';
 
 import { KDP_CREDIT_COSTS, KDP_SAFE_CADENCE_DAYS } from './constants';
@@ -134,6 +135,7 @@ export async function runAndRecordGuardScan(params: {
   epubBase64?: string;
   companionDomain?: string;
   mode?: 'ebook' | 'paperback' | 'dual';
+  lang?: 'en' | 'zh';
   checkLiveCollisions?: boolean;
 }) {
   const ipHash = md5(params.clientIp || 'unknown');
@@ -193,6 +195,7 @@ export async function runAndRecordGuardScan(params: {
     other_pen_domains: otherDomains,
     existing_pen_titles: existingTitles,
     mode: params.mode || 'dual',
+    lang: params.lang || 'en',
     check_live_collisions: params.checkLiveCollisions ?? true,
     enforce_min_words: Boolean(params.projectId),
   });
@@ -286,6 +289,17 @@ export async function listUserProjects(userId: string) {
     .orderBy(desc(kdpProject.createdAt));
 }
 
+async function findOwnedPenProfile(userId: string, penProfileId: string) {
+  const [profile] = await db()
+    .select()
+    .from(kdpPenProfile)
+    .where(
+      and(eq(kdpPenProfile.id, penProfileId), eq(kdpPenProfile.userId, userId))
+    )
+    .limit(1);
+  return profile || null;
+}
+
 export async function getProjectDetail(userId: string, projectId: string) {
   const [project] = await db()
     .select()
@@ -310,12 +324,7 @@ export async function getProjectDetail(userId: string, projectId: string) {
 
   let penProfile = null;
   if (project.penProfileId) {
-    const [p] = await db()
-      .select()
-      .from(kdpPenProfile)
-      .where(eq(kdpPenProfile.id, project.penProfileId))
-      .limit(1);
-    penProfile = p || null;
+    penProfile = await findOwnedPenProfile(userId, project.penProfileId);
   }
 
   return {
@@ -342,20 +351,13 @@ export async function createProjectAndOutline(params: {
   coverTheme?: string;
   language?: string;
 }) {
-  // 校验或自动选定默认作者笔名
+  // 校验或自动选定默认作者笔名（显式传入非本人笔名时物理拒绝）
   let profile = null;
   if (params.penProfileId) {
-    const [p] = await db()
-      .select()
-      .from(kdpPenProfile)
-      .where(
-        and(
-          eq(kdpPenProfile.id, params.penProfileId),
-          eq(kdpPenProfile.userId, params.userId)
-        )
-      )
-      .limit(1);
-    profile = p || null;
+    profile = await findOwnedPenProfile(params.userId, params.penProfileId);
+    if (!profile) {
+      throw new Error('Pen profile not found or access denied');
+    }
   }
   const penName = profile?.fullName || 'Evelyn Vance';
 
@@ -477,6 +479,19 @@ export async function generateFirstChapterFreePreview(
     chapters.find((c: any) => c.sectionType === 'chapter') || chapters[0];
   if (!targetChapter) throw new Error('No chapter available in outline');
 
+  // 已试读或已生成的项目直接复用第 1 章正文，避免重复扣费或覆盖 ready 状态
+  if (
+    targetChapter.contentHtml &&
+    targetChapter.contentHtml.trim().length > 0
+  ) {
+    return {
+      chapterId: targetChapter.id,
+      contentHtml: targetChapter.contentHtml,
+      wordCount: targetChapter.wordCount || 0,
+      reused: true,
+    };
+  }
+
   const out = await generateChapterPreviewViaPython({
     book_title: project.title,
     subtitle: project.subtitle,
@@ -501,18 +516,22 @@ export async function generateFirstChapterFreePreview(
     })
     .where(eq(kdpChapter.id, targetChapter.id));
 
-  await db()
-    .update(kdpProject)
-    .set({
-      status: 'preview_ready',
-      updatedAt: new Date(),
-    })
-    .where(eq(kdpProject.id, projectId));
+  // 已完成出包的项目仅更新章节，绝不将 ready 状态降级为 preview_ready
+  if (project.status !== 'ready') {
+    await db()
+      .update(kdpProject)
+      .set({
+        status: 'preview_ready',
+        updatedAt: new Date(),
+      })
+      .where(eq(kdpProject.id, projectId));
+  }
 
   return {
     chapterId: targetChapter.id,
     contentHtml: out.content_html,
     wordCount,
+    reused: false,
   };
 }
 
@@ -536,6 +555,12 @@ export async function enqueueFullBookGeneration(
       `INSUFFICIENT_CREDITS: Generating full 18k+ word dual-format EPUB + Print PDF bundle requires ${cost} credits (your balance: ${balance}).`
     );
   }
+
+  // Publishing Studio 订阅用户享有最高优先渲染权重
+  const activeSub = await getCurrentSubscription(userId);
+  const subTag =
+    `${activeSub?.productId || ''} ${activeSub?.planName || ''}`.toLowerCase();
+  const queuePriority = subTag.includes('studio') ? 100 : 0;
 
   return db().transaction(async (tx: any) => {
     const consumeRes = await consume({
@@ -563,6 +588,7 @@ export async function enqueueFullBookGeneration(
         costCredits: cost,
         creditId: consumeRes.consumedCredit?.id || '',
         payloadJson: JSON.stringify({
+          priority: queuePriority,
           coverTheme: detail.project.coverTheme,
           trimSize: detail.project.trimSize,
           targetPageCount: detail.project.targetPageCount,
@@ -605,13 +631,31 @@ export async function updateProjectSettings(
     .limit(1);
   if (!existing) throw new Error('Project not found');
 
+  // 严禁跨用户绑定或读取他人 penProfileId（IDOR 防护）
+  const nextPatch = { ...patch };
+  if (nextPatch.penProfileId !== undefined) {
+    const cleanProfileId =
+      typeof nextPatch.penProfileId === 'string'
+        ? nextPatch.penProfileId.trim()
+        : '';
+    if (!cleanProfileId) {
+      nextPatch.penProfileId = null;
+    } else {
+      const ownedProfile = await findOwnedPenProfile(userId, cleanProfileId);
+      if (!ownedProfile) {
+        throw new Error('Pen profile not found or access denied');
+      }
+      nextPatch.penProfileId = ownedProfile.id;
+    }
+  }
+
   const [updated] = await db()
     .update(kdpProject)
     .set({
-      ...patch,
+      ...nextPatch,
       updatedAt: new Date(),
     })
-    .where(eq(kdpProject.id, projectId))
+    .where(and(eq(kdpProject.id, projectId), eq(kdpProject.userId, userId)))
     .returning();
 
   return updated;

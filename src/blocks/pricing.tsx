@@ -65,15 +65,29 @@ export function Pricing({ title }: { title?: string } = {}) {
     { icon: Wand2, label: t('pricing.feature_four_covers') },
   ];
 
-  const proFeatures = [
+  const proFeaturesMonthly = [
     { icon: Sparkles, label: t('pricing.pro_credits') },
     { icon: BookCheck, label: t('pricing.feature_dual_bundle') },
     { icon: ShieldCheck, label: t('pricing.feature_ai_sanitize') },
     { icon: Wand2, label: t('pricing.feature_four_covers') },
   ];
 
-  const studioFeatures = [
+  const proFeaturesYearly = [
+    { icon: Sparkles, label: t('pricing.pro_credits_yearly') },
+    { icon: BookCheck, label: t('pricing.feature_dual_bundle') },
+    { icon: ShieldCheck, label: t('pricing.feature_ai_sanitize') },
+    { icon: Wand2, label: t('pricing.feature_four_covers') },
+  ];
+
+  const studioFeaturesMonthly = [
     { icon: Sparkles, label: t('pricing.studio_credits') },
+    { icon: Layers, label: t('pricing.feature_pen_isolation') },
+    { icon: Zap, label: t('pricing.feature_priority_worker') },
+    { icon: ShieldCheck, label: t('pricing.feature_ai_sanitize') },
+  ];
+
+  const studioFeaturesYearly = [
+    { icon: Sparkles, label: t('pricing.studio_credits_yearly') },
     { icon: Layers, label: t('pricing.feature_pen_isolation') },
     { icon: Zap, label: t('pricing.feature_priority_worker') },
     { icon: ShieldCheck, label: t('pricing.feature_ai_sanitize') },
@@ -105,7 +119,7 @@ export function Pricing({ title }: { title?: string } = {}) {
           interval: 'mo',
           featured: true,
           badge: t('pricing.popular'),
-          features: proFeatures,
+          features: proFeaturesMonthly,
           productId: 'author_pro_monthly',
           priceInCents: 4900,
           currency: 'usd',
@@ -120,7 +134,7 @@ export function Pricing({ title }: { title?: string } = {}) {
           description: t('pricing.studio_desc'),
           price: '$99',
           interval: 'mo',
-          features: studioFeatures,
+          features: studioFeaturesMonthly,
           productId: 'studio_monthly',
           priceInCents: 9900,
           currency: 'usd',
@@ -161,7 +175,7 @@ export function Pricing({ title }: { title?: string } = {}) {
           interval: 'yr',
           featured: true,
           badge: t('pricing.popular'),
-          features: proFeatures,
+          features: proFeaturesYearly,
           productId: 'author_pro_yearly',
           priceInCents: 39000,
           currency: 'usd',
@@ -178,7 +192,7 @@ export function Pricing({ title }: { title?: string } = {}) {
           originalPrice: '$1,188',
           interval: 'yr',
           badge: t('pricing.best_value'),
-          features: studioFeatures,
+          features: studioFeaturesYearly,
           productId: 'studio_yearly',
           priceInCents: 79000,
           currency: 'usd',

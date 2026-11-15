@@ -254,25 +254,28 @@ def _execute_book_pipeline(
     }
 
 
-def _refund_credit_on_failure_pg(cur: Any, credit_id: str) -> None:
-    """在 Postgres 事务中失败退还已扣除积分（与 credits/service.ts revoke 语义一致）。"""
+def _refund_credit_on_failure(cur: Any, credit_id: str, *, is_sqlite: bool = False) -> None:
+    """在任务失败时统一退还已扣除积分（兼容 PostgreSQL 与 SQLite，语义与 credits/service.ts revoke 一致）。"""
     if not credit_id:
         return
+    ph = "?" if is_sqlite else "%s"
     cur.execute(
-        "SELECT consumed_detail FROM credit WHERE id = %s AND transaction_type = 'consume' AND status = 'active' LIMIT 1",
+        f"SELECT consumed_detail FROM credit WHERE id = {ph} AND transaction_type = 'consume' AND status = 'active' LIMIT 1",
         (credit_id,),
     )
     row = cur.fetchone()
-    consumed_raw = (row.get("consumed_detail") if isinstance(row, dict) else row[0]) if row else None
+    if not row:
+        return
+    consumed_raw = row["consumed_detail"] if isinstance(row, dict) or hasattr(row, "keys") else row[0]
     if not consumed_raw:
         return
     items = json.loads(consumed_raw)
     for item in items:
         cur.execute(
-            "UPDATE credit SET remaining_credits = remaining_credits + %s WHERE id = %s",
+            f"UPDATE credit SET remaining_credits = remaining_credits + {ph} WHERE id = {ph}",
             (int(item["creditsConsumed"]), item["creditId"]),
         )
-    cur.execute("UPDATE credit SET status = 'deleted' WHERE id = %s", (credit_id,))
+    cur.execute(f"UPDATE credit SET status = 'deleted' WHERE id = {ph}", (credit_id,))
 
 
 def run_once_postgres(dsn: str) -> bool:
@@ -287,11 +290,12 @@ def run_once_postgres(dsn: str) -> bool:
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_try_advisory_xact_lock(hashtext('kdp_job_claim'))")
                 cur.execute(
-                    """
+                    r"""
                     SELECT * FROM kdp_job
                     WHERE (status = 'queued' OR (status = 'processing' AND lease_until < NOW()))
                       AND attempts < 3
-                    ORDER BY created_at ASC
+                    ORDER BY COALESCE(NULLIF(substring(payload_json FROM '"priority"\s*:\s*(-?[0-9]+)'), ''), '0')::int DESC,
+                             created_at ASC
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
                     """
@@ -343,7 +347,10 @@ def run_once_postgres(dsn: str) -> bool:
 
                 pen_profile = None
                 if project.get("pen_profile_id"):
-                    cur.execute("SELECT * FROM kdp_pen_profile WHERE id = %s", (project["pen_profile_id"],))
+                    cur.execute(
+                        "SELECT * FROM kdp_pen_profile WHERE id = %s AND user_id = %s",
+                        (project["pen_profile_id"], project["user_id"]),
+                    )
                     pen_profile = cur.fetchone()
 
                 cur.execute(
@@ -410,7 +417,7 @@ def run_once_postgres(dsn: str) -> bool:
             traceback.print_exc()
             with conn.transaction():
                 with conn.cursor() as cur:
-                    _refund_credit_on_failure_pg(cur, job.get("credit_id") or "")
+                    _refund_credit_on_failure(cur, job.get("credit_id") or "", is_sqlite=False)
                     cur.execute(
                         "UPDATE kdp_job SET status = 'failed', error = %s, finished_at = NOW() WHERE id = %s",
                         (str(exc), job["id"]),
@@ -435,7 +442,15 @@ def run_once_sqlite(db_path: str) -> bool:
         cur = conn.cursor()
         cur.execute("BEGIN IMMEDIATE")
         cur.execute(
-            "SELECT * FROM kdp_job WHERE status = 'queued' AND attempts < 3 ORDER BY created_at ASC LIMIT 1"
+            """
+            SELECT * FROM kdp_job
+            WHERE status = 'queued' AND attempts < 3
+            ORDER BY CASE WHEN json_valid(payload_json)
+                          THEN COALESCE(CAST(json_extract(payload_json, '$.priority') AS INTEGER), 0)
+                          ELSE 0 END DESC,
+                     created_at ASC
+            LIMIT 1
+            """
         )
         row = cur.fetchone()
         if not row:
@@ -472,7 +487,10 @@ def run_once_sqlite(db_path: str) -> bool:
             chapters = [dict(r) for r in conn.execute("SELECT * FROM kdp_chapter WHERE project_id = ? ORDER BY chapter_index ASC", (project["id"],)).fetchall()]
             pen_profile = None
             if project.get("pen_profile_id"):
-                p_row = conn.execute("SELECT * FROM kdp_pen_profile WHERE id = ?", (project["pen_profile_id"],)).fetchone()
+                p_row = conn.execute(
+                    "SELECT * FROM kdp_pen_profile WHERE id = ? AND user_id = ?",
+                    (project["pen_profile_id"], project["user_id"]),
+                ).fetchone()
                 pen_profile = dict(p_row) if p_row else None
             other_domains = [
                 r["companion_domain"]
@@ -529,6 +547,7 @@ def run_once_sqlite(db_path: str) -> bool:
             )
             conn.commit()
         except Exception as exc:
+            _refund_credit_on_failure(conn.cursor(), job.get("credit_id") or "", is_sqlite=True)
             conn.execute(
                 "UPDATE kdp_job SET status = 'failed', error = ?, finished_at = ? WHERE id = ?",
                 (str(exc), int(time.time() * 1000), job["id"]),
