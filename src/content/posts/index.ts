@@ -1,10 +1,19 @@
 import type { ComponentType } from 'react';
 
+import { envConfigs } from '@/config';
 import { defaultLocale } from '@/config/locale';
 import {
   findPublishedBySlug,
   listPublishedArticles,
 } from '@/modules/posts/service';
+
+function hasConfiguredDatabase(): boolean {
+  return Boolean(
+    process.env.DATABASE_URL ||
+    envConfigs.database_url ||
+    envConfigs.database_provider === 'd1'
+  );
+}
 
 /**
  * Local blog posts written as MDX files in this directory.
@@ -98,6 +107,9 @@ async function getLocalPosts(locale: string): Promise<BlogPost[]> {
 }
 
 async function getDbPosts(): Promise<BlogPost[]> {
+  if (!hasConfiguredDatabase()) {
+    return [];
+  }
   try {
     const rows = await listPublishedArticles();
     return rows.map((row) => ({
@@ -145,23 +157,25 @@ export async function getBlogPost(
   slug: string,
   locale: string
 ): Promise<BlogPostDetail | null> {
-  try {
-    const row = await findPublishedBySlug(slug);
-    if (row) {
-      return {
-        slug: row.slug,
-        title: row.title || row.slug,
-        description: row.description || '',
-        image: row.image || undefined,
-        createdAt: row.createdAt,
-        authorName: row.authorName || undefined,
-        authorImage: row.authorImage || undefined,
-        source: 'db',
-        content: row.content || '',
-      };
+  if (hasConfiguredDatabase()) {
+    try {
+      const row = await findPublishedBySlug(slug);
+      if (row) {
+        return {
+          slug: row.slug,
+          title: row.title || row.slug,
+          description: row.description || '',
+          image: row.image || undefined,
+          createdAt: row.createdAt,
+          authorName: row.authorName || undefined,
+          authorImage: row.authorImage || undefined,
+          source: 'db',
+          content: row.content || '',
+        };
+      }
+    } catch {
+      // 数据库连接失败时降级读取本地 MDX 文章
     }
-  } catch {
-    // Database not configured/reachable — fall through to local posts.
   }
 
   const mod = await loadLocalPost(slug, locale);
