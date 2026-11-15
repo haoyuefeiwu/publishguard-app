@@ -3,5 +3,18 @@
   "description": "来自团队的产品动态、使用指南与工程笔记。",
   "no_posts": "暂无文章,敬请期待。",
   "back_to_blog": "返回博客",
-  "read_more": "阅读全文"
+  "read_more": "阅读全文",
+  "mid_cta_badge": "免费 KDP 预审工具",
+  "mid_cta_title": "在提交 Amazon 审核前，提前拦截书名与排版违规风险",
+  "mid_cta_description": "30 秒完成 26 项 KDP 合规检测，自动核查主副标题堆砌、版权敏感词、开本尺寸、边距与出血设置——完全免费，无需注册。",
+  "mid_cta_button": "免费运行 26 项合规检测",
+  "mid_cta_secondary": "查看免费与专业版对比",
+  "bottom_cta_badge": "准备提交发布了？",
+  "bottom_cta_title": "点击 Publish 前，先给 KDP 账号做一次完整预审",
+  "bottom_cta_description": "使用 PublishGuard 一次性核对标题风险词、装帧与出血参数及平装本内页合规状态。",
+  "bottom_cta_button": "打开 KDP 预审工具",
+  "bottom_cta_pricing": "查看价格方案",
+  "related_title": "相关 KDP 合规指南",
+  "related_subtitle": "更多实操排查清单，帮您避免 KDP 拒稿与质量警告。",
+  "related_view_all": "全部文章"
 }

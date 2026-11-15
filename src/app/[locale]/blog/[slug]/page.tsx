@@ -9,8 +9,15 @@ import { envConfigs } from '@/config';
 import { defaultLocale, locales } from '@/config/locale';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
+import { BlogKdpGuardCta } from '@/components/blog-kdp-guard-cta';
 import { MarkdownContent } from '@/components/markdown-content';
-import { BLOG_POST_SLUGS, formatPostDate, getBlogPost } from '@/content/posts';
+import { RelatedBlogPosts } from '@/components/related-blog-posts';
+import {
+  BLOG_POST_SLUGS,
+  formatPostDate,
+  getBlogPost,
+  getBlogPosts,
+} from '@/content/posts';
 
 // Local MDX posts are pre-rendered; database posts render on demand and are
 // then cached for 10 minutes.
@@ -76,6 +83,30 @@ export default async function BlogPostPage({
   if (!post) notFound();
 
   const t = await getTranslations('blog');
+  const allPosts = await getBlogPosts(locale, { limit: 12 });
+  const relatedPosts = allPosts
+    .filter((item) => item.slug !== slug)
+    .slice(0, 4)
+    .map((item) => ({
+      slug: item.slug,
+      title: item.title,
+      description: item.description,
+      date: formatPostDate(item.createdAt, locale),
+    }));
+
+  const midArticleCta = (
+    <BlogKdpGuardCta
+      variant="mid"
+      badge={t('mid_cta_badge')}
+      title={t('mid_cta_title')}
+      description={t('mid_cta_description')}
+      primaryLabel={t('mid_cta_button')}
+      primaryHref="/tools/kdp-guard"
+      secondaryLabel={t('mid_cta_secondary')}
+      secondaryHref="/pricing"
+    />
+  );
+
   const articleUrl =
     post.source === 'db' || locale === defaultLocale
       ? `${envConfigs.app_url}/blog/${slug}`
@@ -170,8 +201,30 @@ export default async function BlogPostPage({
               <post.Content />
             </div>
           ) : (
-            <MarkdownContent content={post.content || ''} />
+            <MarkdownContent
+              content={post.content || ''}
+              midArticleSlot={midArticleCta}
+            />
           )}
+
+          <BlogKdpGuardCta
+            variant="bottom"
+            badge={t('bottom_cta_badge')}
+            title={t('bottom_cta_title')}
+            description={t('bottom_cta_description')}
+            primaryLabel={t('bottom_cta_button')}
+            primaryHref="/tools/kdp-guard"
+            secondaryLabel={t('bottom_cta_pricing')}
+            secondaryHref="/pricing"
+            className="mt-10"
+          />
+
+          <RelatedBlogPosts
+            title={t('related_title')}
+            subtitle={t('related_subtitle')}
+            viewAllLabel={t('related_view_all')}
+            posts={relatedPosts}
+          />
         </article>
       </main>
       <Footer />

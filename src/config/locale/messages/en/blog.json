@@ -3,5 +3,18 @@
   "description": "Product updates, guides, and engineering notes from the team.",
   "no_posts": "No posts yet — check back soon.",
   "back_to_blog": "Back to blog",
-  "read_more": "Read more"
+  "read_more": "Read more",
+  "mid_cta_badge": "Free KDP Pre-Flight Tool",
+  "mid_cta_title": "Catch KDP title & formatting triggers before Amazon reviews your book",
+  "mid_cta_description": "Run our 26-rule compliance check on your title, subtitle, trim size, margins, and bleed settings in 30 seconds — free, no signup required.",
+  "mid_cta_button": "Run Free 26-Rule Check",
+  "mid_cta_secondary": "Compare Free vs Pro",
+  "bottom_cta_badge": "Ready to publish safely?",
+  "bottom_cta_title": "Protect your KDP account before clicking Publish",
+  "bottom_cta_description": "Verify title & subtitle risk phrases, trim & bleed geometry, and paperback interior readiness with PublishGuard.",
+  "bottom_cta_button": "Open KDP Pre-Flight Guard",
+  "bottom_cta_pricing": "View Pricing",
+  "related_title": "Related KDP Compliance Guides",
+  "related_subtitle": "Practical checklists to help you prevent KDP rejections and quality holds.",
+  "related_view_all": "All guides"
 }
