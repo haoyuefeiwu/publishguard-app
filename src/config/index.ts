@@ -81,6 +81,10 @@ export const envConfigs: Record<string, string> = {
     process.env.KDP_SANITIZER_MODEL ?? 'google/gemini-2.5-flash',
   kdp_artifacts_dir: process.env.KDP_ARTIFACTS_DIR ?? 'data/kdp-artifacts',
 
+  // Growth Platform 自动发文内部同步配置
+  growth_internal_token: process.env.GROWTH_INTERNAL_TOKEN ?? '',
+  growth_draft_author_email: process.env.GROWTH_DRAFT_AUTHOR_EMAIL ?? '',
+
   // 国际化默认语言（主站默认英文，内置简体中文切换）
   locale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE ?? BRAND_CONFIG.defaultLocale,
 };

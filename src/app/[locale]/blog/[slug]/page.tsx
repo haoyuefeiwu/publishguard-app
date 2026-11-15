@@ -32,14 +32,36 @@ export async function generateMetadata({
   if (!post) return {};
 
   const canonical =
-    locale === defaultLocale
+    post.source === 'db' || locale === defaultLocale
       ? `${envConfigs.app_url}/blog/${slug}`
       : `${envConfigs.app_url}/${locale}/blog/${slug}`;
+
+  const alternates: Metadata['alternates'] =
+    post.source === 'local'
+      ? {
+          canonical,
+          languages: Object.fromEntries(
+            locales.map((loc) => [
+              loc,
+              loc === defaultLocale
+                ? `${envConfigs.app_url}/blog/${slug}`
+                : `${envConfigs.app_url}/${loc}/blog/${slug}`,
+            ])
+          ),
+        }
+      : { canonical };
 
   return {
     title: post.title,
     description: post.description,
-    alternates: { canonical },
+    robots: {
+      // 数据库自动推送的英文文章仅放行英文默认路径索引，避免 /zh/ 产生重复英文页面
+      index:
+        post.source === 'local' ||
+        (locale === defaultLocale && Boolean(post.content?.trim())),
+      follow: true,
+    },
+    alternates,
   };
 }
 
@@ -54,12 +76,41 @@ export default async function BlogPostPage({
   if (!post) notFound();
 
   const t = await getTranslations('blog');
+  const articleUrl =
+    post.source === 'db' || locale === defaultLocale
+      ? `${envConfigs.app_url}/blog/${slug}`
+      : `${envConfigs.app_url}/${locale}/blog/${slug}`;
+
+  const articleJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: post.title,
+    description: post.description,
+    datePublished: post.createdAt.toISOString(),
+    mainEntityOfPage: articleUrl,
+    author: {
+      '@type': 'Organization',
+      name: post.authorName || envConfigs.app_name || 'PublishGuard',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: envConfigs.app_name || 'PublishGuard',
+      url: envConfigs.app_url,
+    },
+  };
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <Header />
       <main className="flex-1 px-6 py-12 md:px-8 md:py-16">
         <article className="mx-auto max-w-3xl">
+          <script
+            type="application/ld+json"
+            // 转义 < 防止 JSON-LD 内出现脚本闭合标签注入
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(articleJsonLd).replace(/</g, '\\u003c'),
+            }}
+          />
           <Link
             href="/blog"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors"

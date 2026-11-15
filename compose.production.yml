@@ -57,6 +57,8 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_SIGNING_SECRET: ${STRIPE_SIGNING_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      GROWTH_INTERNAL_TOKEN: ${GROWTH_INTERNAL_TOKEN:-}
+      GROWTH_DRAFT_AUTHOR_EMAIL: ${GROWTH_DRAFT_AUTHOR_EMAIL:-}
       KDP_ARTIFACTS_DIR: /app/data/kdp-artifacts
     volumes:
       - kdp_artifacts:/app/data/kdp-artifacts

@@ -2,12 +2,39 @@ import { envConfigs } from '@/config';
 import { defaultLocale } from '@/config/locale';
 import { getBlogPost, getBlogPosts } from '@/content/posts';
 
+export const dynamic = 'force-dynamic';
 export const revalidate = 3600;
 
 const STATIC_PAGES: { path: string; title: string; description: string }[] = [
-  { path: '', title: 'Home', description: 'Landing page' },
-  { path: '/pricing', title: 'Pricing', description: 'Pricing plans' },
-  { path: '/blog', title: 'Blog', description: 'Blog posts and articles' },
+  {
+    path: '',
+    title: 'Home',
+    description:
+      'PublishGuard — Ban-Proof Amazon KDP Pre-Flight Compliance & AI Book Studio',
+  },
+  {
+    path: '/tools/kdp-guard',
+    title: 'Free KDP Pre-Flight Scanner',
+    description:
+      '26-rule KDP compliance & title collision firewall (3 credits per anonymous daily scan)',
+  },
+  {
+    path: '/studio',
+    title: 'AI Book Studio',
+    description:
+      'Structured 18,000+ word manuscript generation and EPUB/Print PDF KDP bundle compilation (verified on Kindle Previewer 4.0.3)',
+  },
+  {
+    path: '/pricing',
+    title: 'Pricing',
+    description:
+      'Single Book Pass ($29 / 120 credits), Author Pro ($49/mo or $390/yr), and Publishing Studio ($99/mo or $790/yr)',
+  },
+  {
+    path: '/blog',
+    title: 'Blog',
+    description: 'Amazon KDP compliance guides and publishing playbooks',
+  },
 ];
 
 export async function GET() {
