@@ -49,11 +49,9 @@ export async function POST(req: Request) {
 
     await saveConfigs(body);
 
-    // Static (SSG/ISR) pages bake config-driven output — analytics, ads,
-    // customer-service scripts — into their prerendered HTML at build time.
-    // Purge the whole page cache so saved settings take effect on the next
-    // request instead of after the ISR window.
+    // 清除根路由及多语言静态路由缓存，使新配置（如 GA4 ID）立即生效。
     revalidatePath('/', 'layout');
+    revalidatePath('/[locale]', 'layout');
 
     return respOk(noStore);
   } catch (error: any) {

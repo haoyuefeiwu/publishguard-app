@@ -24,7 +24,7 @@ from cover_templates import (
     build_paperback_wrap_html,
     calculate_wrap_dimensions,
 )
-from epub_compiler import compile_epub, make_rgb_qr_png
+from epub_compiler import compile_epub, format_plain_domain, make_rgb_qr_png, prepare_chapter_body_html
 from kdp_guard_service import (
     audit_epub_bytes,
     quick_dictionary_sanitize,
@@ -151,7 +151,8 @@ def test_cover_spine_math_and_four_distinct_themes() -> None:
             page_count=100,
         )
         assert "Evelyn Vance" in front_html
-        assert "ISBN BARCODE ZONE" in wrap_html
+        assert 'class="barcode-safe"' in wrap_html
+        assert "ISBN BARCODE ZONE" not in wrap_html
 
 
 def test_epub_compile_and_binary_guard(tmp_path: Path) -> None:
@@ -195,6 +196,12 @@ def test_epub_compile_and_binary_guard(tmp_path: Path) -> None:
         infos = zf.infolist()
         assert infos[0].filename == "mimetype"
         assert infos[0].compress_type == zipfile.ZIP_STORED
+        opf_xml = zf.read("OEBPS/content.opf").decode("utf-8")
+        assert 'xmlns="http://www.idpf.org/2007/opf"' in opf_xml
+        assert 'property="dcterms:modified"' in opf_xml
+        last_ch_xhtml = zf.read("OEBPS/09_sec-09.xhtml").decode("utf-8")
+        assert "https://evelynvancebooks.com/audio" not in last_ch_xhtml
+        assert "evelynvancebooks.com/audio" in last_ch_xhtml
 
     audit = audit_epub_bytes(
         epub_path.read_bytes(),
@@ -303,3 +310,12 @@ def test_epub_rejects_corrupt_and_hollow_mimetype_archives() -> None:
     assert hollow.passed is False
     codes = {e["code"] for e in hollow.errors}
     assert {"EPUB_INVALID_MIMETYPE", "EPUB_MISSING_OPF", "EPUB_NO_CONTENT"}.issubset(codes)
+
+
+def test_prepare_chapter_body_deduplicates_leading_heading() -> None:
+    """正文开头重复的同题 h2 应被剥离，只保留单个规范 h1 标题，且自动补足偶数页码。"""
+    sample_body = "<h2>1. The Rhythm of Pacing</h2>\n<p>First body paragraph.</p>"
+    normalized = prepare_chapter_body_html(sample_body, "1. The Rhythm of Pacing")
+    assert normalized.count("<h1") == 1
+    assert "<h2" not in normalized
+    assert format_plain_domain("https://getpublishguard.com/sample-companion/") == "getpublishguard.com/sample-companion"

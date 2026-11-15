@@ -10,6 +10,7 @@ PublishGuard EPUB 3 工业级分章编译器（直接提炼自实战过审模板
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import html
 import io
 import re
@@ -40,11 +41,39 @@ def make_rgb_qr_png(target_url: str, size_px: int = 330) -> bytes:
     return buf.getvalue()
 
 
+def format_plain_domain(url: str) -> str:
+    """去除 URL 协议头仅保留纯文本域名，避免 Kindle Previewer 外链巡检误报。"""
+    return re.sub(r"^https?://", "", url.strip(), flags=re.IGNORECASE).rstrip("/")
+
+
+def _normalize_heading_text(text: str) -> str:
+    """规整化章节标题文本用于对比去重。"""
+    plain = re.sub(r"<[^>]+>", "", html.unescape(text or ""))
+    plain = re.sub(r"^\s*(?:chapter\s+\d+\s*[:.-]?|\d+[.)]\s*)", "", plain, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", plain).strip().lower()
+
+
+def prepare_chapter_body_html(body_html: str, chapter_title: str) -> str:
+    """移除正文开头与章标题重复的 h1/h2，并统一注入单个标准 h1 章标题。"""
+    cleaned = (body_html or "").strip()
+    target_norm = _normalize_heading_text(chapter_title)
+    leading_heading = re.match(r"^\s*<(h[12])\b[^>]*>(.*?)</\1>\s*", cleaned, flags=re.IGNORECASE | re.DOTALL)
+    if leading_heading:
+        found_norm = _normalize_heading_text(leading_heading.group(2))
+        if found_norm == target_norm or leading_heading.group(1).lower() == "h1":
+            cleaned = cleaned[leading_heading.end() :].lstrip()
+    return f"<h1>{html.escape(chapter_title)}</h1>\n{cleaned}"
+
+
 def strip_external_links_for_ebook(fragment_html: str) -> str:
-    """遵循规则 20：电子书内严禁保留可点击外部 HTTP 超链接，自动降级为纯文本。"""
+    """遵循规则 20：电子书内严禁保留可点击外部 HTTP 超链接，自动降级为纯文本域名。"""
+    def _replace(match: re.Match[str]) -> str:
+        display_url = html.escape(format_plain_domain(match.group(1)))
+        return f'{match.group(2)} (<span class="url-text">{display_url}</span>)'
+
     return re.sub(
         r'<a\b[^>]*\bhref=["\'](https?://[^"\']+)["\'][^>]*>(.*?)</a>',
-        r'\2 (<span class="url-text">\1</span>)',
+        _replace,
         fragment_html,
         flags=re.IGNORECASE | re.DOTALL,
     )
@@ -149,18 +178,17 @@ def compile_epub(
         extra_images.append((qr_rel_path, qr_bytes, "image/png"))
 
     # 章节内容写入
-    for idx, ch in enumerate(chapters):
+    chap_list = list(chapters)
+    for idx, ch in enumerate(chap_list):
         slug = re.sub(r"[^a-z0-9_-]", "-", (ch.get("slug") or f"sec-{idx:02d}").lower()).strip("-") or f"sec-{idx:02d}"
         filename = f"{idx:02d}_{slug}.xhtml"
         ch_title = ch.get("title") or _extract_heading(ch.get("content_html", ""), f"Chapter {idx + 1}")
-        body_html = ch.get("content_html", "")
-        if "<h1>" not in body_html.lower():
-            body_html = f"<h1>{html.escape(ch_title)}</h1>\n{body_html}"
+        body_html = prepare_chapter_body_html(ch.get("content_html", ""), ch_title)
         body_html = strip_external_links_for_ebook(body_html)
 
         # 如果是最后一项且启用了独立站伴读域名，则以纯文本域名 + 8-bit RGB 二维码合规呈现（规则 5 & 20）
-        if idx == len(list(chapters)) - 1 and qr_rel_path and companion_url.strip():
-            safe_domain = html.escape(companion_url.strip())
+        if idx == len(chap_list) - 1 and qr_rel_path and companion_url.strip():
+            safe_domain = html.escape(format_plain_domain(companion_url))
             body_html += (
                 f"<div class='qr-companion'>"
                 f"<p><strong>Reader Multimedia Companion</strong></p>"
@@ -229,15 +257,17 @@ def compile_epub(
     spine_items = "\n".join(f'    <itemref idref="{sid}" />' for sid, _, _, _ in section_files)
     cover_meta = '<meta name="cover" content="img-0" />' if cover_jpg_bytes else ""
     full_title = f"{title}: {subtitle}" if subtitle.strip() else title
+    modified_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     content_opf = f"""<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/opf/2007" version="3.0" unique-identifier="BookId" xml:lang="{html.escape(language)}">
+<package xmlns="http://www.idpf.org/2007/opf" xmlns:opf="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="BookId" xml:lang="{html.escape(language)}">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="BookId">{book_uuid}</dc:identifier>
     <dc:title>{html.escape(full_title)}</dc:title>
     <dc:creator>{html.escape(author_name)}</dc:creator>
     <dc:language>{html.escape(language)}</dc:language>
     <dc:publisher>Independently published by {html.escape(author_name)}</dc:publisher>
+    <meta property="dcterms:modified">{modified_ts}</meta>
     {cover_meta}
   </metadata>
   <manifest>

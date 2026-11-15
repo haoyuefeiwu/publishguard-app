@@ -13,7 +13,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import { useRouter } from '@/core/i18n/navigation';
+import { Link, useRouter } from '@/core/i18n/navigation';
 import { currentPathWithQuery } from '@/lib/redirect';
 import {
   PaymentProviderModal,
@@ -103,6 +103,8 @@ export function Pricing({ title }: { title?: string } = {}) {
           name: t('pricing.single_name'),
           description: t('pricing.single_desc'),
           price: '$29',
+          featured: true,
+          badge: t('pricing.popular'),
           features: singleFeatures,
           productId: 'single_book_pass',
           priceInCents: 2900,
@@ -117,8 +119,7 @@ export function Pricing({ title }: { title?: string } = {}) {
           description: t('pricing.pro_desc'),
           price: '$49',
           interval: 'mo',
-          featured: true,
-          badge: t('pricing.popular'),
+          badge: t('pricing.pro_badge'),
           features: proFeaturesMonthly,
           productId: 'author_pro_monthly',
           priceInCents: 4900,
@@ -158,6 +159,8 @@ export function Pricing({ title }: { title?: string } = {}) {
           name: t('pricing.single_name'),
           description: t('pricing.single_desc'),
           price: '$29',
+          featured: true,
+          badge: t('pricing.popular'),
           features: singleFeatures,
           productId: 'single_book_pass',
           priceInCents: 2900,
@@ -173,8 +176,7 @@ export function Pricing({ title }: { title?: string } = {}) {
           price: '$390',
           originalPrice: '$588',
           interval: 'yr',
-          featured: true,
-          badge: t('pricing.popular'),
+          badge: t('pricing.pro_badge'),
           features: proFeaturesYearly,
           productId: 'author_pro_yearly',
           priceInCents: 39000,
@@ -273,13 +275,30 @@ export function Pricing({ title }: { title?: string } = {}) {
       className="border-border border-t px-4 py-24 sm:py-32"
     >
       <div className="mx-auto max-w-5xl">
-        <div className="mb-20 text-center">
+        <div className="mb-12 text-center">
           <h2 className="font-serif text-4xl font-normal tracking-tight sm:text-5xl">
             {title ?? t('pricing.title')}
           </h2>
           <p className="text-muted-foreground mx-auto mt-5 max-w-2xl">
             {t('pricing.description')}
           </p>
+          {/* 明确列出 $29 单本通行证真实交付物与样书直达入口 */}
+          <div className="border-border bg-muted/30 mx-auto mt-6 max-w-3xl rounded-2xl border px-5 py-3.5 text-left text-xs leading-relaxed sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <span className="text-foreground font-semibold">
+                {t('pricing.deliverables_banner')}
+              </span>{' '}
+              <span className="text-muted-foreground">
+                {t('pricing.deliverables_items')}
+              </span>
+            </div>
+            <Link
+              href="/#sample-book"
+              className="text-foreground mt-2 inline-flex shrink-0 items-center font-medium underline underline-offset-4 sm:mt-0"
+            >
+              {t('pricing.deliverables_sample_link')} →
+            </Link>
+          </div>
         </div>
         <PricingTable groups={groups} onCheckout={handleCheckout} />
       </div>

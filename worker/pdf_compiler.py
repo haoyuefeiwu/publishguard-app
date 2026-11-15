@@ -26,7 +26,11 @@ from cover_templates import (
     build_ebook_front_cover_html,
     build_paperback_wrap_html,
 )
-from epub_compiler import make_rgb_qr_png
+from epub_compiler import (
+    format_plain_domain,
+    make_rgb_qr_png,
+    prepare_chapter_body_html,
+)
 
 
 def resolve_chrome_binary() -> str:
@@ -152,6 +156,7 @@ def build_paperback_interior_html(
     font_size_pt: float = 10.5,
     line_height: float = 1.56,
     companion_url: str = "",
+    pad_blank_verso: bool = False,
 ) -> str:
     """构建无边框纯正非虚构平装书印刷级内页 HTML（遵循规则 10、11、25）。"""
     trim_w, trim_h = TRIM_DIMENSIONS.get(trim_size, (6.0, 9.0))
@@ -181,24 +186,30 @@ def build_paperback_interior_html(
     toc_entries: list[str] = []
     chap_list = list(chapters)
     for idx, ch in enumerate(chap_list):
-        ch_title = html.escape(ch.get("title") or f"Chapter {idx + 1}")
-        body_html = ch.get("content_html") or ""
-        if "<h1>" not in body_html.lower():
-            body_html = f"<h1>{ch_title}</h1>\n{body_html}"
+        raw_ch_title = ch.get("title") or f"Chapter {idx + 1}"
+        ch_title = html.escape(raw_ch_title)
+        body_html = prepare_chapter_body_html(ch.get("content_html") or "", raw_ch_title)
         # 如果启用伴读域名，在最后一节末尾放 8-bit RGB 伴读二维码
         if idx == len(chap_list) - 1 and companion_url.strip():
             import base64
 
             qr_b64 = base64.b64encode(make_rgb_qr_png(companion_url.strip())).decode("ascii")
+            safe_domain = html.escape(format_plain_domain(companion_url))
             body_html += (
                 f"<div class='qr-companion-print'>"
                 f"<h3>Reader Audio &amp; Study Companion</h3>"
-                f"<p>Visit {html.escape(companion_url.strip())} or scan below to access your complimentary companion resources.</p>"
+                f"<p>Visit {safe_domain} or scan below to access your complimentary companion resources.</p>"
                 f"<img src='data:image/png;base64,{qr_b64}' alt='Companion QR' style='width:1.45in;height:1.45in;' />"
                 f"</div>"
             )
-        toc_entries.append(f"<li>{ch_title}</li>")
+        toc_entries.append(
+            f'<li class="toc-item"><span class="toc-num">{idx + 1}.</span><span>{ch_title}</span></li>'
+        )
         chapter_blocks.append(f'<div class="chapter-break">{body_html}</div>')
+
+    if pad_blank_verso:
+        # 若总页数为奇数，末尾补一张空白偶页以满足印刷装订要求
+        chapter_blocks.append('<div class="chapter-break blank-verso">&nbsp;</div>')
 
     toc_html = f"""
     <div class="chapter-break toc-page">
@@ -275,9 +286,23 @@ def build_paperback_interior_html(
     page-break-before: always;
   }}
   .toc-list {{
-    padding-left: 1.2em;
+    list-style: none;
+    padding-left: 0;
+    margin: 0.12in 0 0 0;
     line-height: 1.85;
     font-size: 10.2pt;
+  }}
+  .toc-item {{
+    display: flex;
+    align-items: baseline;
+    gap: 0.14in;
+    text-align: left;
+    margin-bottom: 0.04in;
+  }}
+  .toc-num {{
+    min-width: 0.28in;
+    font-variant-numeric: tabular-nums;
+    color: #555555;
   }}
   h1 {{
     font-size: 16.5pt;
@@ -408,6 +433,24 @@ def compile_paperback_and_bundle(
     )
     render_html_to_pdf(interior_html_path, interior_pdf_path)
     actual_pages = count_pdf_pages(interior_pdf_path)
+    if actual_pages % 2 == 1:
+        interior_html_path.write_text(
+            build_paperback_interior_html(
+                title=title,
+                subtitle=subtitle,
+                author_name=author_name,
+                edition_label=edition_label,
+                chapters=chapters,
+                trim_size=trim_size,
+                font_size_pt=best_pt,
+                line_height=final_lh,
+                companion_url=companion_url,
+                pad_blank_verso=True,
+            ),
+            encoding="utf-8",
+        )
+        render_html_to_pdf(interior_html_path, interior_pdf_path)
+        actual_pages = count_pdf_pages(interior_pdf_path)
 
     # 1. 生成 1600x2560 eBook 封面 JPG
     front_html_path = work_dir / "02_eBook_Cover_Front.html"
@@ -458,7 +501,7 @@ def compile_paperback_and_bundle(
                 "guidance": "Amazon KDP requires declaring AI-generated text, images, or translations during book setup.",
             },
             "official_previewer_checks": [
-                "Open 01_Kindle_eBook_Upload.epub in Amazon Kindle Previewer 3 before publishing.",
+                "Open 01_Kindle_eBook_Upload.epub in Amazon Kindle Previewer before publishing.",
                 "Inspect 01_Interior_Manuscript_Print.pdf and 03_Paperback_Cover_Wrap.pdf in Amazon KDP Print Previewer.",
             ],
         }

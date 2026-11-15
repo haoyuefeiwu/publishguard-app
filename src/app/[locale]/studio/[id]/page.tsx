@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { Link } from '@/core/i18n/navigation';
 import { KDP_COVER_THEMES } from '@/modules/kdp/constants';
 import { cn } from '@/lib/utils';
+import { KdpCoverThumbnail } from '@/components/kdp-cover-thumbnail';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Card,
@@ -151,6 +152,12 @@ export default function StudioProjectDetailPage() {
 
   const { project, chapters, latestJob, penProfile, credits } = detail;
   const meta = JSON.parse(project.metadataJson || '{}');
+  let jobResult: Record<string, any> = {};
+  try {
+    jobResult = JSON.parse(latestJob?.resultJson || '{}');
+  } catch {
+    jobResult = {};
+  }
   const titleOptions: string[] = meta.title_options || [project.title];
   const keywords: string[] = meta.keywords || [];
   const previewChapter = chapters.find((c: any) => Boolean(c.contentHtml));
@@ -161,9 +168,15 @@ export default function StudioProjectDetailPage() {
     latestJob?.status === 'processing';
   const isReady = project.status === 'ready' && Boolean(project.bundleZipKey);
 
-  // 实时书脊物理尺寸计算
+  // 实时书脊物理尺寸计算：编译完成后优先使用真实统计页数与实际书脊厚度
   const pageThickness = project.paperType === 'white' ? 0.002252 : 0.0025;
-  const spineIn = (project.targetPageCount * pageThickness).toFixed(4);
+  const compiledPages = Number(jobResult.actual_pages || 0);
+  const displayPages =
+    isReady && compiledPages > 0 ? compiledPages : project.targetPageCount;
+  const spineIn =
+    isReady && jobResult.spine_width_in
+      ? Number(jobResult.spine_width_in).toFixed(4)
+      : (displayPages * pageThickness).toFixed(4);
   const [trimW, trimH] =
     project.trimSize === '5.5x8.5' ? [5.5, 8.5] : [6.0, 9.0];
   const wrapW = (0.125 + trimW + Number(spineIn) + trimW + 0.125).toFixed(4);
@@ -179,7 +192,10 @@ export default function StudioProjectDetailPage() {
               {project.status}
             </span>
             <span className="text-muted-foreground">
-              {project.trimSize}&quot; · {project.targetPageCount}pp{' '}
+              {project.trimSize}&quot; ·{' '}
+              {isReady && compiledPages > 0
+                ? `${displayPages} actual pp`
+                : `${displayPages} target pp`}{' '}
               {project.paperType} · Spine {spineIn}&quot; (Wrap {wrapW}&quot; ×{' '}
               {wrapH}&quot;)
             </span>
@@ -241,24 +257,29 @@ export default function StudioProjectDetailPage() {
 
             <div className="space-y-2 pt-2">
               <div className="text-xs font-medium">Cover Architecture</div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {KDP_COVER_THEMES.map((th) => (
                   <button
                     key={th.id}
                     type="button"
                     onClick={() => handleThemeChange(th.id)}
                     className={cn(
-                      'rounded-lg border p-2.5 text-left text-xs transition-colors',
+                      'rounded-lg border p-2 text-left text-xs transition-colors',
                       project.coverTheme === th.id
                         ? 'border-primary ring-primary/20 ring-2'
-                        : 'border-border'
+                        : 'border-border hover:border-foreground/30'
                     )}
                   >
-                    <div
-                      className="mb-1.5 h-3 w-10 rounded"
-                      style={{ backgroundColor: th.previewBg }}
+                    <KdpCoverThumbnail
+                      themeId={th.id}
+                      title={project.title}
+                      authorName={penProfile?.fullName || 'Evelyn Vance'}
+                      editionLabel={
+                        penProfile?.editionLabel || 'INDEPENDENT EDITION'
+                      }
+                      className="mb-2"
                     />
-                    <div className="font-medium">{th.name}</div>
+                    <div className="leading-tight font-medium">{th.name}</div>
                   </button>
                 ))}
               </div>
@@ -327,10 +348,13 @@ export default function StudioProjectDetailPage() {
                 </div>
                 <p className="text-muted-foreground text-[11px] leading-relaxed">
                   Deliverables ready: EPUB 3 + {project.trimSize}&quot; Print
-                  PDF ({project.targetPageCount}pp, Spine {spineIn}&quot;, Wrap{' '}
-                  {wrapW}&quot;×{wrapH}&quot;). Open EPUB in Kindle Previewer 3
-                  and inspect Print PDF in Amazon Print Previewer before
-                  publishing.
+                  PDF (<strong>{displayPages} actual pages</strong>, Spine{' '}
+                  <strong>{spineIn}&quot;</strong>, Full Wrap{' '}
+                  <strong>
+                    {wrapW}&quot;×{wrapH}&quot;
+                  </strong>
+                  ). Open EPUB in Amazon Kindle Previewer and inspect Print PDF
+                  &amp; Cover Wrap in KDP Print Previewer before publishing.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <a

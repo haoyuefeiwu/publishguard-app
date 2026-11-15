@@ -71,12 +71,8 @@ export async function POST(req: Request) {
       '/settings/billing',
       baseUrl
     );
-    // Straight to the destination: safeSameOriginPath has already reduced it
-    // to a path on this site. The old detour through /auth-callback exists to
-    // hand a session token to a desktop client — a browser coming back from
-    // checkout is already signed in, and that page isn't part of this app.
+    // createCheckout 内部会自动包装 /api/payment/callback?order_no=...&redirect=...，此处直接传入最终同源落地页。
     const finalRedirect = `${baseUrl}${safeRedirectPath}`;
-    const successUrl = `${baseUrl}/api/payment/callback?redirect=${encodeURIComponent(finalRedirect)}`;
     const cancelUrl = `${baseUrl}/pricing`;
 
     const checkout = await createCheckout({
@@ -91,7 +87,7 @@ export async function POST(req: Request) {
         price: { amount: chargeAmount, currency: product.currency },
         type: product.type,
         description: product.description,
-        successUrl,
+        successUrl: finalRedirect,
         cancelUrl,
         customer: {
           email: session.user.email,

@@ -12,6 +12,7 @@ import { Header } from '@/blocks/header';
 import { Hero } from '@/blocks/hero';
 import { Pricing } from '@/blocks/pricing';
 import { SupportWidget } from '@/blocks/support-widget';
+import { SampleDeliverables } from '@/components/sample-deliverables';
 
 // Statically generated, refreshed hourly (picks up new blog posts)
 export const revalidate = 3600;
@@ -57,6 +58,7 @@ export default async function HomePage({
       <Header />
       <main>
         <Hero />
+        <SampleDeliverables />
         <Features />
         <Pricing />
         <FAQ />

@@ -144,11 +144,25 @@ export function PricingTable({
             )}
           >
             {/* Plan name */}
-            {plan.name && (
-              <p className="text-foreground mb-2 text-sm font-medium">
-                {plan.name}
-              </p>
-            )}
+            <div className="mb-2 flex items-center justify-between gap-2">
+              {plan.name && (
+                <p className="text-foreground text-sm font-medium">
+                  {plan.name}
+                </p>
+              )}
+              {plan.badge && (
+                <span
+                  className={cn(
+                    'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                    plan.featured
+                      ? 'bg-emerald-600 text-white'
+                      : 'border-border bg-muted text-muted-foreground border'
+                  )}
+                >
+                  {plan.badge}
+                </span>
+              )}
+            </div>
 
             {/* Price */}
             <div className="mb-2 flex items-baseline gap-1">

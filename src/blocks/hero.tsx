@@ -11,20 +11,20 @@ export async function Hero() {
   const t = await getTranslations('landing');
 
   return (
-    <section className="relative isolate flex flex-col items-center justify-center overflow-hidden px-4 pt-20 pb-20 sm:pt-28 sm:pb-28">
+    <section className="relative isolate flex flex-col items-center justify-center overflow-hidden px-4 pt-10 pb-16 sm:pt-14 sm:pb-20">
       <DotPattern
         className={cn(
           '[mask-image:radial-gradient(ellipse_at_center,white,transparent_75%)]',
           'text-foreground/15'
         )}
       />
-      <div className="relative mx-auto w-full max-w-4xl space-y-8 text-center">
+      <div className="relative mx-auto w-full max-w-4xl space-y-5 text-center">
         <div className="border-border bg-card/80 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-medium backdrop-blur-xs">
           <ShieldCheck className="size-3.5 text-emerald-600" />
           <span>{t('hero.badge')}</span>
         </div>
 
-        <h1 className="text-foreground font-serif text-4xl leading-[1.08] font-normal tracking-tight sm:text-6xl">
+        <h1 className="text-foreground font-serif text-4xl leading-[1.08] font-normal tracking-tight sm:text-5xl lg:text-6xl">
           {t('hero.headline')}
         </h1>
 
@@ -33,29 +33,29 @@ export async function Hero() {
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-          <Link
-            href="/studio/new"
+          <a
+            href="#kdp-guard-workbench"
             className={cn(
               buttonVariants({ size: 'lg' }),
-              'h-12 gap-2 rounded-full px-8'
+              'h-11 gap-2 rounded-full px-7'
             )}
           >
             {t('hero.cta')}
             <ArrowRight className="size-4" />
-          </Link>
-          <Link
-            href="/tools/kdp-guard"
+          </a>
+          <a
+            href="#sample-book"
             className={cn(
               buttonVariants({ variant: 'outline', size: 'lg' }),
-              'h-12 gap-2 rounded-full px-7'
+              'h-11 gap-2 rounded-full px-7'
             )}
           >
             {t('hero.secondary')}
-          </Link>
+          </a>
         </div>
 
         {/* 首屏强交互钩子：免注册直接跑一次书名撞车 + 26 项风险快测 */}
-        <div className="pt-6">
+        <div id="kdp-guard-workbench" className="scroll-mt-20 pt-4">
           <KdpGuardWorkbench compact />
         </div>
       </div>

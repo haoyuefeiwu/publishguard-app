@@ -353,13 +353,6 @@ def build_paperback_wrap_html(
     height: 1.2in;
     background: #FFFFFF;
     margin-left: auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: sans-serif;
-    font-size: 7pt;
-    color: #999999;
-    letter-spacing: 0.08em;
   }}
 </style>
 </head>
@@ -375,7 +368,7 @@ def build_paperback_wrap_html(
           Independently published by {safe_author}<br/>
           {dims.page_count} Pages · {dims.paper_type.title()} Paper
         </div>
-        <div class="barcode-safe">ISBN BARCODE ZONE</div>
+        <div class="barcode-safe"></div>
       </div>
     </div>
     <div class="spine-panel">
