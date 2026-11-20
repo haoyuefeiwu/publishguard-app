@@ -634,3 +634,109 @@ def test_worker_decrypts_enc_v1_aes_gcm_secrets(tmp_path: Path, monkeypatch) -> 
     monkeypatch.setenv("CONFIG_ENCRYPTION_KEY", "wrong-key")
     assert worker_main.decrypt_config_value(enc_openrouter) == ""
     conn.close()
+
+
+def test_sqlite_worker_compile_manuscript_uses_zero_llm_and_refunds_on_guard_block(tmp_path: Path, monkeypatch) -> None:
+    """compile_manuscript 任务严禁调用 LLM，应支持人类作者自定义书名与自然页数编译；遇违禁词须拦截并 100% 退还 60 积分。"""
+    import json
+    import book_writer
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("FALLBACK_API_KEY", "")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "")
+    monkeypatch.delenv("KDP_ALLOW_DEMO_TEMPLATE", raising=False)
+
+    def fail_if_llm_called(**kwargs):
+        raise AssertionError("compile_manuscript 不得调用任何 LLM 接口")
+
+    monkeypatch.setattr(book_writer, "_post_chat_completions", fail_if_llm_called)
+
+    db_file = tmp_path / "import_compile.db"
+    artifacts_dir = tmp_path / "artifacts"
+    monkeypatch.setattr(worker_main, "ARTIFACTS_ROOT", artifacts_dir)
+    conn = _create_queue_db_with_credits(db_file)
+
+    # 1) 正常人类原创导入书稿（~6,000 词，<15k 仍应放行！不设 Pen Profile 而使用 author_name_override）
+    proj_id = "proj-import-ok"
+    conn.execute(
+        """
+        INSERT INTO kdp_project VALUES (
+            ?, 'u1', NULL, 'Quiet Fieldcraft Monograph',
+            'Focused Work Routines for Independent Creators',
+            'Self-Help', 'Imported manuscript', '', '', '',
+            6000, 6000, '6x9', 0, 'cream', 'editorial_split', 'en', 'manuscript_ready', 1, 100,
+            '{"source_mode":"imported_manuscript","author_name_override":"Clara Chen","back_blurb":"Clean human treatise on sustained creative discipline."}',
+            '', '', '', '', '', '{}', 0, 0
+        )
+        """,
+        (proj_id,),
+    )
+    prose_chapter = "<p>" + " ".join(["attention", "structure", "calm", "cadence", "discipline"] * 300) + "</p>"
+    for i in range(4):
+        conn.execute(
+            "INSERT INTO kdp_chapter VALUES (?, ?, 'u1', ?, 'chapter', ?, ?, 'Summary', ?, 1500, 'imported', 0, 0)",
+            (f"ch-imp-{i}", proj_id, i, f"Chapter {i+1}: Craft", f"ch-{i+1}", prose_chapter),
+        )
+    conn.execute(
+        "INSERT INTO kdp_job VALUES ('job-imp-ok', ?, 'u1', 'compile_manuscript', 'queued', 0, 'queued', 0, NULL, NULL, 60, '', '{}', '{}', NULL, 1, NULL)",
+        (proj_id,),
+    )
+
+    # 2) 包含严重临床医学词汇的导入书稿 -> 必须被 Guard 拦截失败且 100% 退还 60 积分
+    bad_proj_id = "proj-import-bad"
+    grant_id = "grant-60"
+    consume_id = "consume-60"
+    conn.execute("INSERT INTO credit VALUES (?, 'u2', 'grant', 60, 0, 'active', NULL)", (grant_id,))
+    conn.execute(
+        "INSERT INTO credit VALUES (?, 'u2', 'consume', -60, 0, 'active', ?)",
+        (consume_id, json.dumps([{"creditId": grant_id, "creditsConsumed": 60}])),
+    )
+    conn.execute(
+        """
+        INSERT INTO kdp_project VALUES (
+            ?, 'u2', NULL, 'Forbidden Medical Guide',
+            'Instant Cure', 'Self-Help', 'Imported', '', '', '',
+            500, 500, '6x9', 0, 'cream', 'editorial_split', 'en', 'manuscript_ready', 0, 20,
+            '{"source_mode":"imported_manuscript","author_name_override":"Clara Chen","back_blurb":"Practical habits."}',
+            '', '', '', '', '', '{}', 0, 0
+        )
+        """,
+        (bad_proj_id,),
+    )
+    conn.execute(
+        "INSERT INTO kdp_chapter VALUES ('ch-imp-bad', ?, 'u2', 0, 'chapter', 'Chapter 1: Risky', 'ch-1', 'Summary', '<p>Guaranteed fast ADHD and insomnia medical cure right now.</p>', 9, 'imported', 0, 0)",
+        (bad_proj_id,),
+    )
+    conn.execute(
+        "INSERT INTO kdp_job VALUES ('job-imp-bad', ?, 'u2', 'compile_manuscript', 'queued', 0, 'queued', 0, NULL, NULL, 60, ?, '{}', '{}', NULL, 2, NULL)",
+        (bad_proj_id, consume_id),
+    )
+    conn.commit()
+    conn.close()
+
+    assert worker_main.run_once_sqlite(f"file:{db_file}") is True
+    assert worker_main.run_once_sqlite(f"file:{db_file}") is True
+
+    check = sqlite3.connect(db_file)
+    check.row_factory = sqlite3.Row
+    job_ok = dict(check.execute("SELECT * FROM kdp_job WHERE id = 'job-imp-ok'").fetchone())
+    proj_ok = dict(check.execute("SELECT * FROM kdp_project WHERE id = ?", (proj_id,)).fetchone())
+    job_bad = dict(check.execute("SELECT * FROM kdp_job WHERE id = 'job-imp-bad'").fetchone())
+    grant_after = dict(check.execute("SELECT * FROM credit WHERE id = ?", (grant_id,)).fetchone())
+    consume_after = dict(check.execute("SELECT * FROM credit WHERE id = ?", (consume_id,)).fetchone())
+    check.close()
+
+    assert job_ok["status"] == "succeeded", f"Imported compile failed: {job_ok.get('error')}"
+    snap = json.loads(proj_ok["compiled_snapshot_json"])
+    assert snap["author_name"] == "Clara Chen"
+    assert snap["actual_pages"] >= 20
+    assert snap["actual_pages"] % 2 == 0
+    assert (artifacts_dir / proj_ok["bundle_zip_key"]).exists()
+
+    checklist_json = json.loads((artifacts_dir / proj_id / "04_KDP_Metadata_Checklist.json").read_text(encoding="utf-8"))
+    assert "None — Human-authored imported manuscript" in checklist_json["ai_generated_disclosure"]["text_content"]
+
+    assert job_bad["status"] == "failed"
+    assert "KDP Guard failed" in (job_bad["error"] or "")
+    assert grant_after["remaining_credits"] == 60
+    assert consume_after["status"] == "deleted"

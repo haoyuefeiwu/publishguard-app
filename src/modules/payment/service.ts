@@ -28,6 +28,7 @@ import {
   type UpdateSubscription,
 } from '@/modules/subscriptions/service';
 import { getSnowId, getUniSeq, getUuid } from '@/lib/hash';
+import { notifyPublishGuardTelegram } from '@/lib/telegram';
 
 // --- Order types ---
 
@@ -356,6 +357,8 @@ export async function handleCheckoutSuccess(session: any, provider: string) {
       );
     }
 
+    let didMarkPaid = false;
+
     try {
       await db().transaction(async (tx: any) => {
         // 1. 仅当订单处于 created/pending 时原子转为 paid，并发重放仅有一个胜出
@@ -372,6 +375,7 @@ export async function handleCheckoutSuccess(session: any, provider: string) {
           .returning();
 
         if (!claimedOrder) return;
+        didMarkPaid = true;
 
         // 2. 创建订阅记录（受 uidx_subscription_provider_id 唯一索引兜底）
         if (subNo && subscriptionInfo && session.subscriptionId) {
@@ -437,6 +441,25 @@ export async function handleCheckoutSuccess(session: any, provider: string) {
       if (isUniqueConstraintError(error)) return;
       throw error;
     }
+
+    if (didMarkPaid) {
+      const paidCents = Number(
+        paymentInfo?.paymentAmount ?? existingOrder.amount ?? 0
+      );
+      const paidDollars = (paidCents / 100).toFixed(2);
+      const curCode = String(
+        paymentInfo?.paymentCurrency || existingOrder.currency || 'usd'
+      ).toUpperCase();
+      void notifyPublishGuardTelegram(
+        [
+          '💰 PublishGuard 收到新付款订单！',
+          `套餐: ${existingOrder.productName || existingOrder.planName || existingOrder.productId}`,
+          `金额: $${paidDollars} ${curCode}`,
+          `用户: ${existingOrder.userEmail || paymentInfo?.paymentEmail || '未知'}`,
+          `通道: ${provider}${paymentInfo?.discountCode ? ` · 优惠码: ${paymentInfo.discountCode}` : ''}`,
+        ].join('\n')
+      );
+    }
   } else if (
     session.paymentStatus === PaymentStatus.FAILED ||
     session.paymentStatus === PaymentStatus.CANCELED
@@ -484,6 +507,8 @@ export async function handleSubscriptionRenewal(
   const dedupTxId =
     paymentInfo?.transactionId || paymentInfo?.invoiceId || null;
   const renewalOrderNo = getSnowId();
+
+  let didRenew = false;
 
   try {
     await db().transaction(async (tx: any) => {
@@ -569,10 +594,26 @@ export async function handleSubscriptionRenewal(
           status: 'active',
         });
       }
+      didRenew = true;
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) return;
     throw error;
+  }
+
+  if (didRenew) {
+    const paidCents = Number(
+      paymentInfo?.paymentAmount ?? existingSub.amount ?? 0
+    );
+    const paidDollars = (paidCents / 100).toFixed(2);
+    void notifyPublishGuardTelegram(
+      [
+        '🔁 PublishGuard 订阅自动续费成功',
+        `套餐: ${existingSub.productName || existingSub.planName || existingSub.productId}`,
+        `金额: $${paidDollars} ${String(existingSub.currency || 'usd').toUpperCase()}`,
+        `用户: ${existingSub.userEmail || paymentInfo?.paymentEmail || '未知'}`,
+      ].join('\n')
+    );
   }
 }
 

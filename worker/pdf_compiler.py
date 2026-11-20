@@ -388,9 +388,11 @@ def compile_paperback_and_bundle(
     companion_url: str = "",
     epub_path: Path | None = None,
     metadata_checklist: dict | None = None,
+    lock_target_pages: bool = True,
+    source_mode: str = "ai_generated",
 ) -> dict[str, str]:
     """
-    执行二分锁页 Chrome 渲染，生成完整 KDP 双轨产物并打包 `KDP_Ready_Bundle.zip`。
+    执行二分锁页或标准自然流 Chrome 渲染，生成完整 KDP 双轨产物并打包 `KDP_Ready_Bundle.zip`。
     返回所有导出产物的相对文件路径字典与最终页数。
     """
     import json
@@ -399,43 +401,47 @@ def compile_paperback_and_bundle(
     interior_html_path = work_dir / "01_Interior_Manuscript.html"
     interior_pdf_path = work_dir / "01_Interior_Manuscript_Print.pdf"
 
-    # 二分搜索字体大小与行高使物理页数逼近目标页数（且确保偶数）
-    low_pt, high_pt = 8.4, 12.6
-    best_pt = 10.5
-    best_pages = target_pages
-    best_diff = 9999
+    if not lock_target_pages or target_pages <= 0:
+        # 自带长篇书稿自然流排版：采用标准 10.5pt 出版字号直接渲染真实页数，再自动对齐偶数页与书脊
+        best_pt = 10.5
+        final_lh = 1.54
+    else:
+        # 二分搜索字体大小与行高使物理页数逼近目标页数（且确保偶数）
+        low_pt, high_pt = 8.4, 12.6
+        best_pt = 10.5
+        best_diff = 9999
 
-    for _ in range(7):
-        mid_pt = (low_pt + high_pt) / 2.0
-        lh = round(1.44 + (mid_pt - 8.4) * 0.04, 3)
-        html_str = build_paperback_interior_html(
-            title=title,
-            subtitle=subtitle,
-            author_name=author_name,
-            edition_label=edition_label,
-            chapters=chapters,
-            trim_size=trim_size,
-            font_size_pt=mid_pt,
-            line_height=lh,
-            companion_url=companion_url,
-        )
-        interior_html_path.write_text(html_str, encoding="utf-8")
-        render_html_to_pdf(interior_html_path, interior_pdf_path)
-        pages = count_pdf_pages(interior_pdf_path)
-        diff = abs(pages - target_pages)
-        if diff < best_diff:
-            best_diff = diff
-            best_pt = mid_pt
-            best_pages = pages
-        if pages == target_pages:
-            break
-        if pages > target_pages:
-            high_pt = mid_pt
-        else:
-            low_pt = mid_pt
+        for _ in range(7):
+            mid_pt = (low_pt + high_pt) / 2.0
+            lh = round(1.44 + (mid_pt - 8.4) * 0.04, 3)
+            html_str = build_paperback_interior_html(
+                title=title,
+                subtitle=subtitle,
+                author_name=author_name,
+                edition_label=edition_label,
+                chapters=chapters,
+                trim_size=trim_size,
+                font_size_pt=mid_pt,
+                line_height=lh,
+                companion_url=companion_url,
+            )
+            interior_html_path.write_text(html_str, encoding="utf-8")
+            render_html_to_pdf(interior_html_path, interior_pdf_path)
+            pages = count_pdf_pages(interior_pdf_path)
+            diff = abs(pages - target_pages)
+            if diff < best_diff:
+                best_diff = diff
+                best_pt = mid_pt
+            if pages == target_pages:
+                break
+            if pages > target_pages:
+                high_pt = mid_pt
+            else:
+                low_pt = mid_pt
 
-    # 以最优字号最后一次确保落盘一致
-    final_lh = round(1.44 + (best_pt - 8.4) * 0.04, 3)
+        final_lh = round(1.44 + (best_pt - 8.4) * 0.04, 3)
+
+    # 以选定字号执行最终内页 PDF 渲染（若自然页数为奇数，末尾补空白偶页）
     interior_html_path.write_text(
         build_paperback_interior_html(
             title=title,
@@ -503,22 +509,34 @@ def compile_paperback_and_bundle(
     wrap_html_path.write_text(wrap_html_str, encoding="utf-8")
     render_html_to_pdf(wrap_html_path, wrap_pdf_path)
 
-    # 3. 保存元数据核对单（含 AI 生成内容申报提示与官方预览器核验步骤）
+    # 3. 保存元数据核对单（区分人类原创导入书稿与 AI 全书生成对应的 KDP 申报文案）
     checklist_path = work_dir / "04_KDP_Metadata_Checklist.json"
     checklist_data = metadata_checklist or {}
+    is_imported = source_mode == "imported_manuscript"
+    disclosure = (
+        {
+            "required_by_kdp": True,
+            "text_content": "None — Human-authored imported manuscript (select AI-assisted only if you ran optional AI Compliance Sanitizer)",
+            "images_or_cover": "Template typographic cover (no AI-generated artwork)",
+            "guidance": "If your manuscript was written by you without AI generation, select 'No' for AI-generated content unless you used AI editing tools above KDP's AI-assisted threshold.",
+        }
+        if is_imported
+        else {
+            "required_by_kdp": True,
+            "text_content": "AI-generated (entire or edited)",
+            "images_or_cover": "AI-generated / None (verify against your cover setup)",
+            "guidance": "Amazon KDP requires declaring AI-generated text, images, or translations during book setup.",
+        }
+    )
     checklist_data.update(
         {
+            "source_mode": source_mode,
             "actual_pages": actual_pages,
             "spine_width_in": wrap_dims.spine_width,
             "wrap_dimensions_in": f"{wrap_dims.total_width} x {wrap_dims.total_height}",
             "paper_type": paper_type,
             "trim_size": trim_size,
-            "ai_generated_disclosure": {
-                "required_by_kdp": True,
-                "text_content": "AI-generated (entire or edited)",
-                "images_or_cover": "AI-generated / None (verify against your cover setup)",
-                "guidance": "Amazon KDP requires declaring AI-generated text, images, or translations during book setup.",
-            },
+            "ai_generated_disclosure": disclosure,
             "official_previewer_checks": [
                 "Open 01_Kindle_eBook_Upload.epub in Amazon Kindle Previewer before publishing.",
                 "Inspect 01_Interior_Manuscript_Print.pdf and 03_Paperback_Cover_Wrap.pdf in Amazon KDP Print Previewer.",

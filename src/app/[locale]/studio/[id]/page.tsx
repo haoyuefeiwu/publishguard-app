@@ -132,6 +132,28 @@ export default function StudioProjectDetailPage() {
     }
   }
 
+  async function handleCompileManuscript() {
+    setCompiling(true);
+    try {
+      const res = await fetch(
+        `/api/kdp/projects/${projectId}/compile-manuscript`,
+        {
+          method: 'POST',
+        }
+      );
+      const json = await res.json();
+      if (json.code !== 0) throw new Error(json.message);
+      toast.success(
+        'Manuscript compilation enqueued! Building EPUB 3 & Print PDFs...'
+      );
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.message || 'Insufficient credits or enqueue error');
+    } finally {
+      setCompiling(false);
+    }
+  }
+
   async function handleCompileFullBook() {
     setCompiling(true);
     try {
@@ -199,6 +221,14 @@ export default function StudioProjectDetailPage() {
   }
   const activeSnapshot: Record<string, any> | null =
     compiledSnapshot || succeededResult?.compiled_snapshot || null;
+
+  const isImportedManuscript = meta.source_mode === 'imported_manuscript';
+  const requiredCompileCredits = isImportedManuscript ? 60 : 100;
+  const resolvedDisplayAuthor =
+    penProfile?.fullName || meta.author_name_override || 'Evelyn Vance';
+  const initialGuardErrors: any[] = Array.isArray(meta.initial_guard_errors)
+    ? meta.initial_guard_errors
+    : [];
 
   const titleOptions: string[] = meta.title_options || [project.title];
   const keywords: string[] = meta.keywords || [];
@@ -297,10 +327,17 @@ export default function StudioProjectDetailPage() {
             <span className="bg-muted rounded px-2 py-0.5 font-mono uppercase">
               {project.status}
             </span>
+            {isImportedManuscript && (
+              <span className="rounded bg-blue-500/10 px-2 py-0.5 font-medium text-blue-700 dark:text-blue-300">
+                {t('badge_imported')}
+              </span>
+            )}
             <span className="text-muted-foreground">
               {isReady && !isSnapshotStale
                 ? `${exportedTrimSize}" · ${exportedPages} actual pp ${exportedPaperType} · Spine ${exportedSpineIn}" (Wrap ${exportedWrapW}" × ${exportedWrapH}")`
-                : `Draft ${project.trimSize}" · ${project.targetPageCount} target pp ${project.paperType} · Est. Spine ${draftSpineIn}" (Wrap ${draftWrapW}" × ${draftWrapH}")`}
+                : project.targetPageCount === 0
+                  ? `Draft ${project.trimSize}" · Auto Natural Flow (${meta.estimated_pages ? `Est. ~${meta.estimated_pages} pp` : 'Standard 10.5pt Print'}) · ${project.paperType}`
+                  : `Draft ${project.trimSize}" · ${project.targetPageCount} target pp ${project.paperType} · Est. Spine ${draftSpineIn}" (Wrap ${draftWrapW}" × ${draftWrapH}")`}
             </span>
           </div>
           <h1 className="mt-2 font-serif text-2xl font-medium tracking-tight sm:text-3xl">
@@ -314,12 +351,14 @@ export default function StudioProjectDetailPage() {
           <div className="bg-muted/60 rounded-lg px-3 py-1.5 text-xs">
             Credits: <strong>{credits}</strong>
           </div>
-          {credits < 100 && !isReady && (
+          {credits < requiredCompileCredits && !isReady && (
             <Link
               href="/pricing"
               className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
             >
-              Get Pass ($29)
+              {isImportedManuscript
+                ? 'Get Format Pass ($19)'
+                : 'Get Pass ($29)'}
             </Link>
           )}
         </div>
@@ -378,7 +417,7 @@ export default function StudioProjectDetailPage() {
                     <KdpCoverThumbnail
                       themeId={th.id}
                       title={project.title}
-                      authorName={penProfile?.fullName || 'Evelyn Vance'}
+                      authorName={resolvedDisplayAuthor}
                       editionLabel={
                         penProfile?.editionLabel || 'INDEPENDENT EDITION'
                       }
@@ -392,15 +431,16 @@ export default function StudioProjectDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Step 2 & 3 核心生成控制面板 */}
+        {/* Step 2 & 3 核心生成与排版控制面板 */}
         <Card className="flex flex-col justify-between">
           <CardHeader>
             <CardTitle className="text-base">
               Production Pipeline &amp; 26-Rule Audit
             </CardTitle>
             <CardDescription className="text-xs">
-              Preview Chapter 1 free before committing 100 credits to compile
-              your complete 18k+ word eBook + 6×9 Print PDF bundle.
+              {isImportedManuscript
+                ? 'Compile your imported manuscript verbatim into Kindle EPUB 3, even-page Print PDF, Cover Wrap, and KDP checklist (60 credits / $19 Format Pass).'
+                : 'Preview Chapter 1 free before committing 100 credits to compile your complete 18k+ word eBook + 6×9 Print PDF bundle.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -421,6 +461,38 @@ export default function StudioProjectDetailPage() {
                 </div>
               </div>
             )}
+
+            {!isWorking &&
+              isImportedManuscript &&
+              !project.guardPassed &&
+              initialGuardErrors.length > 0 && (
+                <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-900 dark:text-amber-200">
+                  <div className="flex items-center justify-between gap-2 font-semibold">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldAlert className="size-4 shrink-0" />
+                      Initial Guard Alert ({project.guardScore}/100 ·{' '}
+                      {initialGuardErrors.length} blocking findings)
+                    </span>
+                    <Link
+                      href="/tools/kdp-guard"
+                      className="underline underline-offset-4"
+                    >
+                      Clean in KDP Guard →
+                    </Link>
+                  </div>
+                  <ul className="list-disc space-y-1 pl-4 text-[11px] opacity-90">
+                    {initialGuardErrors.slice(0, 3).map((ge, idx) => (
+                      <li key={idx}>
+                        <span className="font-mono font-semibold">
+                          {ge.code}
+                        </span>
+                        {ge.matched_text ? ` (${ge.matched_text})` : ''}:{' '}
+                        {ge.suggestion || ge.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
             {!isWorking && latestJob?.status === 'failed' && (
               <div className="space-y-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs text-rose-900 dark:text-rose-200">
@@ -539,22 +611,24 @@ export default function StudioProjectDetailPage() {
             )}
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePreviewChapter1}
-                disabled={previewing || isWorking}
-                className="gap-1.5"
-              >
-                {previewing ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
-                {t('btn_preview_ch1')}
-              </Button>
+              {!isImportedManuscript && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePreviewChapter1}
+                  disabled={previewing || isWorking}
+                  className="gap-1.5"
+                >
+                  {previewing ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                  {t('btn_preview_ch1')}
+                </Button>
+              )}
 
-              {hasFullManuscript && credits >= 10 && (
+              {hasDeliverables && hasFullManuscript && credits >= 10 && (
                 <Button
                   type="button"
                   variant={isSnapshotStale ? 'default' : 'outline'}
@@ -571,7 +645,32 @@ export default function StudioProjectDetailPage() {
                 </Button>
               )}
 
-              {credits >= 100 || isReady ? (
+              {isImportedManuscript ? (
+                credits >= 60 || isReady ? (
+                  <Button
+                    type="button"
+                    variant={hasDeliverables ? 'outline' : 'default'}
+                    onClick={handleCompileManuscript}
+                    disabled={compiling || recompiling || isWorking}
+                    className="gap-1.5"
+                  >
+                    {compiling ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Rocket className="size-4" />
+                    )}
+                    {t('btn_compile_imported')}
+                  </Button>
+                ) : (
+                  <Link
+                    href="/pricing"
+                    className={cn(buttonVariants(), 'gap-1.5')}
+                  >
+                    <Lock className="size-4" />
+                    {t('btn_unlock_format')}
+                  </Link>
+                )
+              ) : credits >= 100 || isReady ? (
                 <Button
                   type="button"
                   variant={hasFullManuscript ? 'outline' : 'default'}
@@ -600,12 +699,14 @@ export default function StudioProjectDetailPage() {
         </Card>
       </div>
 
-      {/* 12 节结构化大纲展示 */}
+      {/* 结构化章节展示 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <FileText className="size-4" />
-            12-Section Non-Fiction Architecture
+            {isImportedManuscript
+              ? `Imported Manuscript Chapters (${chapters.length} sections · ${project.actualWordCount.toLocaleString()} words)`
+              : '12-Section Non-Fiction Architecture'}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
@@ -633,8 +734,8 @@ export default function StudioProjectDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Free Preview: {previewChapter.title} ({previewChapter.wordCount}{' '}
-              words)
+              {isImportedManuscript ? 'Chapter Preview: ' : 'Free Preview: '}
+              {previewChapter.title} ({previewChapter.wordCount} words)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -667,10 +768,7 @@ export default function StudioProjectDetailPage() {
               `Subtitle (${project.subtitle.length} chars · Combined ${project.title.length + project.subtitle.length}/200)`,
               project.subtitle,
             ],
-            [
-              'Author Name (Exact Match)',
-              penProfile?.fullName || 'Evelyn Vance',
-            ],
+            ['Author Name (Exact Match)', resolvedDisplayAuthor],
             [
               'Primary KDP Category',
               `${project.genre} > ${meta.subcategory_hint || 'Personal Transformation'}`,
@@ -679,7 +777,9 @@ export default function StudioProjectDetailPage() {
             ['Clean Book Description', meta.back_blurb || ''],
             [
               'KDP AI-Generated Content Disclosure (Required)',
-              'Text: AI-generated (entire or edited) · Verify cover asset origin · Confirm in Kindle Previewer 3 & Print Previewer',
+              isImportedManuscript
+                ? 'None — Human-authored manuscript (select AI-assisted only if you ran optional AI Compliance Sanitizer) · Typographic cover · Confirm in Kindle Previewer'
+                : 'Text: AI-generated (entire or edited) · Verify cover asset origin · Confirm in Kindle Previewer 3 & Print Previewer',
             ],
           ].map(([label, val]) => (
             <div

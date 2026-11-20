@@ -468,3 +468,97 @@ def test_html_sanitizer_and_chrome_network_isolation(tmp_path: Path) -> None:
     assert "--proxy-server=http://127.0.0.1:1" in flags
     assert "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost" in flags
     assert "--disable-background-networking" in flags
+
+
+def test_manuscript_parser_supports_docx_epub_md_txt_and_blocks_unsafe_archives(tmp_path: Path) -> None:
+    """自带书稿解析器必须支持 docx/epub/md/txt 切章、XSS/外链剥离，并拦截 Zip Slip 与过短手稿。"""
+    import base64
+    import io
+    import pytest
+    from manuscript_parser import parse_manuscript_payload
+
+    long_para_a = " ".join(["attention", "composure", "practice", "clarity", "focus"] * 24)
+    long_para_b = " ".join(["habit", "cadence", "dialogue", "structure", "calm"] * 24)
+
+    # 1) Markdown 切章 + Frontmatter + 外链文本化
+    md_text = (
+        "---\n"
+        "title: Quiet Cadence Handbook\n"
+        "author: Maya Lin\n"
+        "---\n\n"
+        f"# Chapter 1: First Principles\n\n**Key idea:** {long_para_a}. See [Companion Portal](https://mayalinbooks.com/audio).\n\n"
+        f"# Chapter 2: Daily Structure\n\n{long_para_b}.\n"
+    )
+    res_md = parse_manuscript_payload({"filename": "draft.md", "raw_text": md_text})
+    assert res_md["title"] == "Quiet Cadence Handbook"
+    assert res_md["author_name"] == "Maya Lin"
+    assert len(res_md["chapters"]) == 2
+    assert res_md["total_word_count"] >= 200
+    assert "<a " not in res_md["chapters"][0]["content_html"].lower()
+    assert "mayalinbooks.com/audio" in res_md["chapters"][0]["content_html"]
+    assert "<strong>Key idea:</strong>" in res_md["chapters"][0]["content_html"]
+
+    # 2) .txt 按 Chapter N 切章
+    txt_text = f"Chapter 1: Openings\n\n{long_para_a}\n\nChapter 2: Closings\n\n{long_para_b}\n"
+    res_txt = parse_manuscript_payload({"filename": "book.txt", "raw_text": txt_text})
+    assert len(res_txt["chapters"]) == 2
+    assert res_txt["chapters"][1]["title"] == "Chapter 2: Closings"
+
+    # 3) .docx 真实二进制 ZIP 解析（含非 Chapter 正则的 Heading1 切章、Heading2 与 core.xml 元数据）
+    doc_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:body>
+        <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Morning Grounding</w:t></w:r></w:p>
+        <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Subheading Focus</w:t></w:r></w:p>
+        <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Bold start </w:t></w:r><w:r><w:t>{long_para_a}</w:t></w:r></w:p>
+        <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Evening Cadence</w:t></w:r></w:p>
+        <w:p><w:r><w:t>{long_para_b}</w:t></w:r></w:p>
+      </w:body>
+    </w:document>"""
+    core_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">
+      <dc:title>DOCX Monograph Title</dc:title>
+      <dc:creator>Clara Chen</dc:creator>
+    </cp:coreProperties>"""
+    docx_buf = io.BytesIO()
+    with zipfile.ZipFile(docx_buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("word/document.xml", doc_xml)
+        zf.writestr("docProps/core.xml", core_xml)
+    res_docx = parse_manuscript_payload(
+        {"filename": "manuscript.docx", "content_base64": base64.b64encode(docx_buf.getvalue()).decode("ascii")}
+    )
+    assert res_docx["title"] == "DOCX Monograph Title"
+    assert res_docx["author_name"] == "Clara Chen"
+    assert len(res_docx["chapters"]) == 2
+    assert res_docx["chapters"][0]["title"] == "Morning Grounding"
+    assert "<h2>Subheading Focus</h2>" in res_docx["chapters"][0]["content_html"]
+    assert "<strong>Bold start </strong>" in res_docx["chapters"][0]["content_html"]
+
+    # 4) .epub 提取（带脚本剥离验证）
+    epub_path = tmp_path / "user_upload.epub"
+    compile_epub(
+        output_epub_path=epub_path,
+        title="Imported EPUB Work",
+        subtitle="Clean Structure",
+        author_name="Noah Patel",
+        chapters=[
+            {"title": "Chapter 1: Start", "slug": "ch1", "content_html": f"<p>{long_para_a}</p>"},
+            {"title": "Chapter 2: Finish", "slug": "ch2", "content_html": f"<p>{long_para_b}</p>"},
+        ],
+    )
+    res_epub = parse_manuscript_payload(
+        {"filename": "user_upload.epub", "content_base64": base64.b64encode(epub_path.read_bytes()).decode("ascii")}
+    )
+    assert res_epub["author_name"] == "Noah Patel"
+    assert len(res_epub["chapters"]) == 2
+
+    # 5) 拦截 Zip Slip 路径穿越与 <100 词短稿
+    evil_zip = io.BytesIO()
+    with zipfile.ZipFile(evil_zip, "w") as zf:
+        zf.writestr("../../evil.xml", "<p>pwn</p>")
+    with pytest.raises(ValueError, match="Unsafe archive entry path"):
+        parse_manuscript_payload(
+            {"filename": "evil.docx", "content_base64": base64.b64encode(evil_zip.getvalue()).decode("ascii")}
+        )
+    with pytest.raises(ValueError, match="too short"):
+        parse_manuscript_payload({"filename": "short.txt", "raw_text": "Too short manuscript."})

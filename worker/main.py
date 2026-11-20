@@ -174,24 +174,27 @@ def _execute_book_pipeline(
         shutil.rmtree(stage_dir, ignore_errors=True)
     stage_dir.mkdir(parents=True, exist_ok=True)
 
+    meta = json.loads(project.get("metadata_json") or "{}")
     author_name = (
         pen_profile["full_name"]
         if pen_profile and pen_profile.get("full_name")
-        else "Evelyn Vance"
+        else str(meta.get("author_name_override") or "").strip() or "Evelyn Vance"
     )
     edition_label = (
         pen_profile["edition_label"]
         if pen_profile and pen_profile.get("edition_label")
         else "INDEPENDENT EDITION"
     )
-    meta = json.loads(project.get("metadata_json") or "{}")
+    source_mode = str(meta.get("source_mode") or "ai_generated").strip() or "ai_generated"
+    is_imported_compile = job_type == "compile_manuscript"
+    is_imported_project = is_imported_compile or source_mode == "imported_manuscript"
     cover_theme = project.get("cover_theme", "editorial_split")
     trim_size = project.get("trim_size", "6x9")
     target_pages = int(project.get("target_page_count", 100))
     paper_type = project.get("paper_type", "cream")
 
     try:
-        # 1. 准备全书章节正文（快速重打包绝不调用 LLM，全书生成强制校验真实密钥）
+        # 1. 准备全书章节正文（快速重打包与自带书稿编译绝不调用 LLM，全书生成强制校验真实密钥）
         total = max(1, len(chapters))
         prev_summaries: list[str] = []
         compiled_chapters: list[dict[str, str]] = []
@@ -201,11 +204,11 @@ def _execute_book_pipeline(
             raw_existing = (ch.get("content_html") or "").strip()
             content_html = sanitize_chapter_html(raw_existing)
 
-            if job_type == "recompile_bundle":
+            if job_type in ("recompile_bundle", "compile_manuscript"):
                 update_progress(10 + int((idx / total) * 40), f"loading_chapter_{idx + 1}_of_{total}")
                 if not content_html:
                     raise RuntimeError(
-                        f"Missing chapter prose for `{ch['title']}` during bundle recompile."
+                        f"Missing chapter prose for `{ch['title']}` during bundle compilation."
                     )
                 wc = count_words(content_html)
             else:
@@ -305,11 +308,14 @@ def _execute_book_pipeline(
             companion_url=project.get("companion_url", ""),
             epub_path=epub_path,
             metadata_checklist=checklist_meta,
+            lock_target_pages=(not is_imported_project and target_pages > 0),
+            source_mode=source_mode,
         )
 
         # 5. 双重 Pre-Flight Guard 物理把关（EPUB 二进制结构体检 + 全书正文合规审计）
         update_progress(95, "running_26_rule_guard")
         full_manuscript_html = "\n".join(c["content_html"] for c in compiled_chapters)
+        enforce_min = not is_imported_project
         epub_audit = audit_epub_bytes(
             epub_path.read_bytes(),
             title=project["title"],
@@ -322,7 +328,7 @@ def _execute_book_pipeline(
             existing_pen_titles=existing_titles,
             mode="ebook",
             check_live_collisions=False,
-            enforce_min_words=True,
+            enforce_min_words=enforce_min,
         )
         guard_res = run_preflight_audit(
             title=project["title"],
@@ -336,7 +342,7 @@ def _execute_book_pipeline(
             existing_pen_titles=existing_titles,
             mode="dual",
             check_live_collisions=True,
-            enforce_min_words=True,
+            enforce_min_words=enforce_min,
         )
 
         # 合并 EPUB 容器级致命错误（避免重复正文提示，保留容器/压缩/1-bit/spine 等缺陷）

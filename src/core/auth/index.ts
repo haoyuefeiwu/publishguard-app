@@ -19,6 +19,7 @@ import {
   guessLocaleFromAcceptLanguage,
 } from '@/lib/cookie';
 import { getUuid } from '@/lib/hash';
+import { notifyPublishGuardTelegram } from '@/lib/telegram';
 
 function assertProductionAuthSecret() {
   // Only enforce at runtime, not during `next build` static analysis where
@@ -287,6 +288,16 @@ export function getAuth(configs?: Record<string, string>) {
             } catch (error) {
               console.error('[auth] grant signup credits failed', error);
             }
+
+            // 非阻塞实时推送新用户注册告警到 Telegram
+            void notifyPublishGuardTelegram(
+              [
+                '🆕 PublishGuard 新用户注册',
+                `邮箱: ${createdUser.email || '未知'}`,
+                `来源 UTM: ${createdUser.utmSource || 'direct'}`,
+                `语言: ${createdUser.locale || 'en'}`,
+              ].join('\n')
+            );
           },
         },
       },

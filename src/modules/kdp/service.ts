@@ -20,6 +20,7 @@ import { consume, revoke } from '@/modules/credits/service';
 import { getCurrentSubscription } from '@/modules/subscriptions/service';
 import { getUuid, md5 } from '@/lib/hash';
 import { sanitizeChapterHtml } from '@/lib/html-sanitizer';
+import { notifyPublishGuardTelegram } from '@/lib/telegram';
 
 import {
   KDP_COVER_THEMES,
@@ -31,6 +32,7 @@ import {
   executeKdpGuardAudit,
   generateBookOutlineViaPython,
   generateChapterPreviewViaPython,
+  parseManuscriptViaPython,
   type GuardAuditResponse,
 } from './python-bridge';
 
@@ -446,6 +448,198 @@ export async function deleteProjectSafely(userId: string, projectId: string) {
   return result;
 }
 
+const ALLOWED_TRIM_SIZES = new Set(['6x9', '5.5x8.5', '8.5x11']);
+const ALLOWED_PAPER_TYPES = new Set(['cream', 'white']);
+const ALLOWED_COVER_THEMES = new Set<string>(KDP_COVER_THEMES.map((t) => t.id));
+
+/**
+ * 免费导入作者自带书稿（.docx/.epub/.md/.txt 或纯文本）立项并运行 26 项合规预检（0 积分立项）。
+ */
+export async function importManuscriptProject(params: {
+  userId: string;
+  userEmail?: string;
+  penProfileId?: string;
+  title?: string;
+  subtitle?: string;
+  authorName?: string;
+  genre: string;
+  description?: string;
+  companionUrl?: string;
+  trimSize?: string;
+  targetPageCount?: number;
+  paperType?: string;
+  coverTheme?: string;
+  language?: string;
+  filename?: string;
+  contentBase64?: string;
+  rawText?: string;
+}) {
+  const trimSize = params.trimSize || '6x9';
+  const paperType = params.paperType || 'cream';
+  const coverTheme = params.coverTheme || 'editorial_split';
+  if (!ALLOWED_TRIM_SIZES.has(trimSize)) throw new Error('Invalid trim size');
+  if (!ALLOWED_PAPER_TYPES.has(paperType))
+    throw new Error('Invalid paper type');
+  if (!ALLOWED_COVER_THEMES.has(coverTheme)) {
+    throw new Error('Invalid cover theme');
+  }
+
+  const parsedTargetPages =
+    params.targetPageCount === undefined
+      ? 0
+      : Math.round(Number(params.targetPageCount));
+  if (
+    !Number.isFinite(parsedTargetPages) ||
+    (parsedTargetPages !== 0 &&
+      (parsedTargetPages < 40 || parsedTargetPages > 600))
+  ) {
+    throw new Error('Target page count must be 0 (auto) or between 40 and 600');
+  }
+
+  let profile = null;
+  if (params.penProfileId) {
+    profile = await findOwnedPenProfile(params.userId, params.penProfileId);
+    if (!profile) {
+      throw new Error('Pen profile not found or access denied');
+    }
+  }
+
+  const parsed = await parseManuscriptViaPython({
+    filename: params.filename,
+    content_base64: params.contentBase64,
+    raw_text: params.rawText,
+    title: params.title,
+    subtitle: params.subtitle,
+    author_name: params.authorName,
+  });
+
+  const chosenTitle =
+    (params.title || '').trim() || parsed.title || 'Untitled Manuscript';
+  const chosenSub = (params.subtitle || '').trim() || parsed.subtitle || '';
+  const resolvedAuthor =
+    profile?.fullName ||
+    (params.authorName || '').trim() ||
+    parsed.author_name ||
+    'Independent Author';
+  const resolvedCompanionUrl =
+    (params.companionUrl || '').trim() || profile?.companionDomain || '';
+
+  let otherDomains: string[] = [];
+  let existingTitles: string[] = [];
+  const allProfiles = await db()
+    .select({
+      id: kdpPenProfile.id,
+      companionDomain: kdpPenProfile.companionDomain,
+    })
+    .from(kdpPenProfile)
+    .where(eq(kdpPenProfile.userId, params.userId));
+  otherDomains = allProfiles
+    .map((p: any) => p.companionDomain)
+    .filter(
+      (d: string) =>
+        Boolean(d) && normalizeHost(d) !== normalizeHost(resolvedCompanionUrl)
+    );
+
+  const existingProjs = await db()
+    .select({ title: kdpProject.title })
+    .from(kdpProject)
+    .where(eq(kdpProject.userId, params.userId));
+  existingTitles = existingProjs.map((p: any) => p.title);
+
+  const combinedHtml = parsed.chapters.map((c) => c.content_html).join('\n');
+  const backBlurb =
+    (params.description || '').trim() ||
+    parsed.chapters[0]?.summary ||
+    chosenTitle;
+
+  const initialGuard = await executeKdpGuardAudit({
+    title: chosenTitle,
+    subtitle: chosenSub,
+    description: backBlurb,
+    author_name: resolvedAuthor,
+    primary_category: params.genre || 'Self-Help',
+    manuscript_text: combinedHtml,
+    companion_domain: resolvedCompanionUrl,
+    other_pen_domains: otherDomains,
+    existing_pen_titles: existingTitles,
+    mode: 'dual',
+    check_live_collisions: true,
+    enforce_min_words: false,
+  });
+
+  const projectId = getUuid();
+  const metadataJson = JSON.stringify({
+    source_mode: 'imported_manuscript',
+    original_filename: params.filename || '',
+    author_name_override: profile ? '' : resolvedAuthor,
+    estimated_pages: parsed.estimated_pages,
+    title_options: [chosenTitle],
+    subcategory_hint: 'General',
+    back_blurb: backBlurb,
+    keywords: [],
+    initial_collisions: initialGuard.collisions,
+    initial_guard_errors: initialGuard.errors,
+    initial_guard_warnings: initialGuard.warnings,
+  });
+
+  const [project] = await db()
+    .insert(kdpProject)
+    .values({
+      id: projectId,
+      userId: params.userId,
+      penProfileId: profile?.id || null,
+      title: chosenTitle,
+      subtitle: chosenSub,
+      genre: params.genre || 'Self-Help',
+      topicPrompt: `Imported manuscript (${parsed.total_word_count} words)`,
+      targetAudience: '',
+      companionProduct: '',
+      companionUrl: resolvedCompanionUrl,
+      targetWordCount: parsed.total_word_count,
+      actualWordCount: parsed.total_word_count,
+      trimSize,
+      targetPageCount: parsedTargetPages,
+      paperType,
+      coverTheme,
+      language: params.language || 'en',
+      status: 'manuscript_ready',
+      guardPassed: initialGuard.passed,
+      guardScore: initialGuard.score,
+      metadataJson,
+    })
+    .returning();
+
+  const chapterValues = parsed.chapters.map((ch, idx) => ({
+    id: getUuid(),
+    projectId,
+    userId: params.userId,
+    chapterIndex: ch.chapter_index ?? idx,
+    sectionType: ch.section_type || 'chapter',
+    title: ch.title,
+    slug: ch.slug || `sec-${idx + 1}`,
+    summary: ch.summary || '',
+    contentHtml: ch.content_html,
+    wordCount: ch.word_count,
+    status: 'imported',
+  }));
+
+  if (chapterValues.length > 0) {
+    await db().insert(kdpChapter).values(chapterValues);
+  }
+
+  void notifyPublishGuardTelegram(
+    [
+      '📄 PublishGuard 新书稿导入立项',
+      `书名: ${chosenTitle}`,
+      `篇幅: ${parsed.total_word_count.toLocaleString()} words · ${chapterValues.length} sections`,
+      `预检分: ${initialGuard.score}/100 (${initialGuard.errors.length} errors)`,
+      `用户: ${params.userEmail || params.userId}`,
+    ].join('\n')
+  );
+
+  return { project, chapters: chapterValues, initialGuard, parsed };
+}
+
 export async function createProjectAndOutline(params: {
   userId: string;
   penProfileId?: string;
@@ -667,7 +861,7 @@ function isUniqueJobConstraintError(error: any): boolean {
 async function enqueueBookJob(
   userId: string,
   projectId: string,
-  jobType: 'generate_book' | 'recompile_bundle'
+  jobType: 'generate_book' | 'compile_manuscript' | 'recompile_bundle'
 ) {
   const detail = await getProjectDetail(userId, projectId);
   if (!detail) throw new Error('Project not found');
@@ -678,16 +872,33 @@ async function enqueueBookJob(
     throw new Error('A generation job is already in progress for this project');
   }
 
-  // 快速重打包（10 积分）严禁在尚未产出全书正文时调用，防止绕过 100 积分全书生成费用
+  let projectMeta: Record<string, any> = {};
+  try {
+    projectMeta = JSON.parse(detail.project.metadataJson || '{}');
+  } catch {
+    projectMeta = {};
+  }
+  const sourceMode = String(projectMeta.source_mode || 'ai_generated');
+  const hasFullManuscript =
+    detail.chapters.length > 0 &&
+    detail.chapters.every(
+      (ch: any) => (ch.contentHtml || '').trim().length > 0
+    );
+
+  // 快速重打包（10 积分）严禁在尚未首次完成导出包时调用，防止绕过 60/100 积分编译费
   if (jobType === 'recompile_bundle') {
-    const hasFullManuscript =
-      detail.chapters.length > 0 &&
-      detail.chapters.every(
-        (ch: any) => (ch.contentHtml || '').trim().length > 0
-      );
-    if (!hasFullManuscript) {
+    if (!hasFullManuscript || !detail.project.bundleZipKey) {
       throw new Error(
-        'Cannot quick-recompile before the full manuscript has been generated. Run Full Book Generation first.'
+        'Cannot quick-recompile before the initial KDP bundle has been compiled and exported.'
+      );
+    }
+  }
+
+  // 自带书稿编译（60 积分）严禁用于 AI 立项从零写书项目，防止绕过 100 积分全书生成费
+  if (jobType === 'compile_manuscript') {
+    if (sourceMode !== 'imported_manuscript' || !hasFullManuscript) {
+      throw new Error(
+        'Compile Imported Manuscript (60 credits) is only available for imported full manuscripts.'
       );
     }
   }
@@ -695,7 +906,9 @@ async function enqueueBookJob(
   const cost =
     jobType === 'recompile_bundle'
       ? KDP_CREDIT_COSTS.RECOMPILE_BUNDLE
-      : KDP_CREDIT_COSTS.GENERATE_FULL_BOOK_BUNDLE;
+      : jobType === 'compile_manuscript'
+        ? KDP_CREDIT_COSTS.COMPILE_IMPORTED_MANUSCRIPT
+        : KDP_CREDIT_COSTS.GENERATE_FULL_BOOK_BUNDLE;
 
   // Publishing Studio 订阅用户享有最高优先渲染权重
   const activeSub = await getCurrentSubscription(userId);
@@ -704,7 +917,7 @@ async function enqueueBookJob(
   const queuePriority = subTag.includes('studio') ? 100 : 0;
 
   try {
-    return await db().transaction(async (tx: any) => {
+    const job = await db().transaction(async (tx: any) => {
       // 1. 先原子抢占项目队列锁，防止并发请求重复扣分入队
       const [claimedProject] = await tx
         .update(kdpProject)
@@ -729,27 +942,40 @@ async function enqueueBookJob(
       }
 
       // 2. 在同一事务内扣除积分（余额不足时事务自动回滚项目状态）
+      const consumeScene =
+        jobType === 'recompile_bundle'
+          ? 'kdp_recompile'
+          : jobType === 'compile_manuscript'
+            ? 'kdp_compile_manuscript'
+            : 'kdp_full_book';
+      const consumeDesc =
+        jobType === 'recompile_bundle'
+          ? `Recompile KDP Bundle: ${detail.project.title}`
+          : jobType === 'compile_manuscript'
+            ? `Format & Compile Manuscript Bundle: ${detail.project.title}`
+            : `Compile Dual-Format KDP Bundle: ${detail.project.title}`;
+
       const consumeRes = await consume({
         userId,
         credits: cost,
-        scene:
-          jobType === 'recompile_bundle' ? 'kdp_recompile' : 'kdp_full_book',
-        description:
-          jobType === 'recompile_bundle'
-            ? `Recompile KDP Bundle: ${detail.project.title}`
-            : `Compile Dual-Format KDP Bundle: ${detail.project.title}`,
+        scene: consumeScene,
+        description: consumeDesc,
         tx,
       });
       if (!consumeRes.success) {
         const currentBalance = consumeRes.balance ?? 0;
+        const needLabel =
+          jobType === 'compile_manuscript'
+            ? `Compiling your imported manuscript into the KDP 5-file bundle requires ${cost} credits ($19 Format & Guard Pass)`
+            : `Generating full 18k+ word dual-format EPUB + Print PDF bundle requires ${cost} credits`;
         throw new Error(
-          `INSUFFICIENT_CREDITS: Generating full 18k+ word dual-format EPUB + Print PDF bundle requires ${cost} credits (your balance: ${currentBalance}).`
+          `INSUFFICIENT_CREDITS: ${needLabel} (your balance: ${currentBalance}).`
         );
       }
 
       // 3. 写入任务记录（受数据库 partial unique index uidx_kdp_job_active_project 兜底）
       const jobId = getUuid();
-      const [job] = await tx
+      const [insertedJob] = await tx
         .insert(kdpJob)
         .values({
           id: jobId,
@@ -763,6 +989,7 @@ async function enqueueBookJob(
           creditId: consumeRes.consumedCredit?.id || '',
           payloadJson: JSON.stringify({
             priority: queuePriority,
+            sourceMode,
             coverTheme: detail.project.coverTheme,
             trimSize: detail.project.trimSize,
             targetPageCount: detail.project.targetPageCount,
@@ -771,8 +998,19 @@ async function enqueueBookJob(
         })
         .returning();
 
-      return job;
+      return insertedJob;
     });
+
+    void notifyPublishGuardTelegram(
+      [
+        '⚙️ PublishGuard 编译任务已入队',
+        `类型: ${jobType} (${cost} credits)`,
+        `书名: ${detail.project.title}`,
+        `用户: ${userId}`,
+      ].join('\n')
+    );
+
+    return job;
   } catch (err) {
     if (isUniqueJobConstraintError(err)) {
       throw new Error(
@@ -790,16 +1028,19 @@ export async function enqueueFullBookGeneration(
   return enqueueBookJob(userId, projectId, 'generate_book');
 }
 
+export async function enqueueManuscriptCompile(
+  userId: string,
+  projectId: string
+) {
+  return enqueueBookJob(userId, projectId, 'compile_manuscript');
+}
+
 export async function enqueueBundleRecompile(
   userId: string,
   projectId: string
 ) {
   return enqueueBookJob(userId, projectId, 'recompile_bundle');
 }
-
-const ALLOWED_TRIM_SIZES = new Set(['6x9', '5.5x8.5', '8.5x11']);
-const ALLOWED_PAPER_TYPES = new Set(['cream', 'white']);
-const ALLOWED_COVER_THEMES = new Set<string>(KDP_COVER_THEMES.map((t) => t.id));
 
 export async function updateProjectSettings(
   userId: string,
@@ -850,8 +1091,13 @@ export async function updateProjectSettings(
   }
   if (nextPatch.targetPageCount !== undefined) {
     const pages = Math.round(Number(nextPatch.targetPageCount));
-    if (!Number.isFinite(pages) || pages < 40 || pages > 600) {
-      throw new Error('Target page count must be between 40 and 600');
+    if (
+      !Number.isFinite(pages) ||
+      (pages !== 0 && (pages < 40 || pages > 600))
+    ) {
+      throw new Error(
+        'Target page count must be 0 (auto) or between 40 and 600'
+      );
     }
     nextPatch.targetPageCount = pages;
   }

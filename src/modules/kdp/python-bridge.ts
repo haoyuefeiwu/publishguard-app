@@ -145,6 +145,44 @@ export interface GuardAuditResponse {
   extracted_excerpt?: string;
 }
 
+export interface ParsedManuscriptChapter {
+  chapter_index: number;
+  section_type: string;
+  title: string;
+  slug: string;
+  summary: string;
+  content_html: string;
+  word_count: number;
+}
+
+export interface ParsedManuscriptResult {
+  title: string;
+  subtitle: string;
+  author_name: string;
+  total_word_count: number;
+  estimated_pages: number;
+  chapters: ParsedManuscriptChapter[];
+}
+
+/**
+ * 调用 `manuscript_parser.py` 解析用户上传的 `.docx`/`.epub`/`.md`/`.txt` 或纯文本书稿并执行 HTML 白名单净化。
+ */
+export async function parseManuscriptViaPython(params: {
+  filename?: string;
+  content_base64?: string;
+  raw_text?: string;
+  title?: string;
+  subtitle?: string;
+  author_name?: string;
+}): Promise<ParsedManuscriptResult> {
+  return runPythonJsonScript<ParsedManuscriptResult>(
+    'manuscript_parser.py',
+    ['--stdin'],
+    params,
+    45_000
+  );
+}
+
 /**
  * 调用 `kdp_guard_service.py` 运行 26 项上架前物理合规体检与全网撞车查重。
  */

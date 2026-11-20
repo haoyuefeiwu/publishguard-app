@@ -58,6 +58,13 @@ export function Pricing({ title }: { title?: string } = {}) {
     [configs]
   );
 
+  const formatFeatures = [
+    { icon: Sparkles, label: t('pricing.format_credits') },
+    { icon: BookCheck, label: t('pricing.feature_dual_bundle') },
+    { icon: ShieldCheck, label: t('pricing.feature_guard_unlimited') },
+    { icon: Wand2, label: t('pricing.feature_four_covers') },
+  ];
+
   const singleFeatures = [
     { icon: Sparkles, label: t('pricing.single_credits') },
     { icon: BookCheck, label: t('pricing.feature_dual_bundle') },
@@ -99,11 +106,25 @@ export function Pricing({ title }: { title?: string } = {}) {
       label: t('pricing.monthly'),
       plans: [
         {
+          id: 'format-guard-pass',
+          name: t('pricing.format_name'),
+          description: t('pricing.format_desc'),
+          price: '$19',
+          featured: true,
+          badge: t('pricing.format_badge'),
+          features: formatFeatures,
+          productId: 'manuscript_format_pass',
+          priceInCents: 1900,
+          currency: 'usd',
+          credits: 60,
+          creditsValidDays: 365,
+          buttonText: t('pricing.buy_format'),
+        },
+        {
           id: 'single-book-pass',
           name: t('pricing.single_name'),
           description: t('pricing.single_desc'),
           price: '$29',
-          featured: true,
           badge: t('pricing.popular'),
           features: singleFeatures,
           productId: 'single_book_pass',
@@ -155,11 +176,25 @@ export function Pricing({ title }: { title?: string } = {}) {
       label: t('pricing.yearly'),
       plans: [
         {
+          id: 'format-guard-pass-yr',
+          name: t('pricing.format_name'),
+          description: t('pricing.format_desc'),
+          price: '$19',
+          featured: true,
+          badge: t('pricing.format_badge'),
+          features: formatFeatures,
+          productId: 'manuscript_format_pass',
+          priceInCents: 1900,
+          currency: 'usd',
+          credits: 60,
+          creditsValidDays: 365,
+          buttonText: t('pricing.buy_format'),
+        },
+        {
           id: 'single-book-pass-yr',
           name: t('pricing.single_name'),
           description: t('pricing.single_desc'),
           price: '$29',
-          featured: true,
           badge: t('pricing.popular'),
           features: singleFeatures,
           productId: 'single_book_pass',
@@ -274,7 +309,7 @@ export function Pricing({ title }: { title?: string } = {}) {
       id="pricing"
       className="border-border border-t px-4 py-24 sm:py-32"
     >
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-6xl">
         <div className="mb-12 text-center">
           <h2 className="font-serif text-4xl font-normal tracking-tight sm:text-5xl">
             {title ?? t('pricing.title')}

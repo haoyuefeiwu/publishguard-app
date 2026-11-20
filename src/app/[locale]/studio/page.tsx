@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BookOpen,
   Coins,
+  FileUp,
   Plus,
   ShieldAlert,
   ShieldCheck,
@@ -33,7 +34,18 @@ interface ProjectItem {
   guardPassed: boolean;
   guardScore: number;
   coverTheme: string;
+  metadataJson?: string;
   createdAt: string;
+}
+
+function isImportedProject(proj: ProjectItem): boolean {
+  if (proj.status === 'manuscript_ready') return true;
+  try {
+    const meta = JSON.parse(proj.metadataJson || '{}');
+    return meta?.source_mode === 'imported_manuscript';
+  } catch {
+    return false;
+  }
 }
 
 export default function StudioHomePage() {
@@ -71,7 +83,17 @@ export default function StudioHomePage() {
             <Users className="size-4" />
             {t('btn_profiles')}
           </Link>
-          <Link href="/studio/new" className={cn(buttonVariants(), 'gap-1.5')}>
+          <Link
+            href="/studio/new?mode=import"
+            className={cn(buttonVariants({ variant: 'outline' }), 'gap-1.5')}
+          >
+            <FileUp className="size-4" />
+            {t('btn_import')}
+          </Link>
+          <Link
+            href="/studio/new?mode=generate"
+            className={cn(buttonVariants(), 'gap-1.5')}
+          >
             <Plus className="size-4" />
             {t('btn_new')}
           </Link>
@@ -143,13 +165,25 @@ export default function StudioHomePage() {
             <p className="text-muted-foreground mx-auto max-w-md text-sm">
               {t('empty')}
             </p>
-            <Link
-              href="/studio/new"
-              className={cn(buttonVariants(), 'gap-2 rounded-full px-6')}
-            >
-              <Plus className="size-4" />
-              {t('btn_new')}
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/studio/new?mode=import"
+                className={cn(buttonVariants(), 'gap-2 rounded-full px-6')}
+              >
+                <FileUp className="size-4" />
+                {t('btn_import')}
+              </Link>
+              <Link
+                href="/studio/new?mode=generate"
+                className={cn(
+                  buttonVariants({ variant: 'outline' }),
+                  'gap-2 rounded-full px-6'
+                )}
+              >
+                <Plus className="size-4" />
+                {t('btn_new')}
+              </Link>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -158,9 +192,16 @@ export default function StudioHomePage() {
             <Card key={proj.id} className="flex flex-col justify-between">
               <CardHeader className="space-y-2">
                 <div className="flex items-center justify-between gap-2 text-xs">
-                  <span className="bg-muted rounded px-2 py-0.5 font-mono uppercase">
-                    {proj.status}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="bg-muted rounded px-2 py-0.5 font-mono uppercase">
+                      {proj.status}
+                    </span>
+                    {isImportedProject(proj) && (
+                      <span className="rounded bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300">
+                        {t('badge_imported')}
+                      </span>
+                    )}
+                  </div>
                   {proj.guardPassed ? (
                     <span className="inline-flex items-center gap-1 text-emerald-600">
                       <ShieldCheck className="size-3.5" />

@@ -272,15 +272,15 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
   }
 
   const studioNewParams = new URLSearchParams();
+  studioNewParams.set('mode', 'generate');
   if (title.trim()) studioNewParams.set('topic', title.trim());
   else if (description.trim())
     studioNewParams.set('topic', description.trim().slice(0, 120));
   if (category.trim()) studioNewParams.set('category', category.trim());
   if (companionDomain.trim())
     studioNewParams.set('domain', companionDomain.trim());
-  const studioNewHref = studioNewParams.toString()
-    ? `/studio/new?${studioNewParams.toString()}`
-    : '/studio/new';
+  const studioNewHref = `/studio/new?${studioNewParams.toString()}`;
+  const studioImportHref = '/studio/new?mode=import';
   const authCallbackUrl = encodeURIComponent('/tools/kdp-guard');
 
   return (
@@ -729,27 +729,50 @@ export function KdpGuardWorkbench({ compact = false }: { compact?: boolean }) {
             </div>
           )}
 
-          {/* 漏斗转化引导 CTA */}
-          <div className="border-border bg-muted/40 flex flex-col justify-between gap-3 rounded-xl border p-4 sm:flex-row sm:items-center">
+          {/* 漏斗转化引导 CTA：主推已有书稿 $19 一键合规排版编译，次推从零 AI 构建 */}
+          <div className="border-border bg-muted/40 flex flex-col justify-between gap-3 rounded-xl border p-4 lg:flex-row lg:items-center">
             <div className="text-xs">
               <div className="font-semibold">
-                Ready to build a 18,000+ word book that passes every KDP audit?
+                Ready to compile this manuscript into a verified KDP 5-file
+                bundle?
               </div>
               <div className="text-muted-foreground mt-0.5">
-                Start free in Book Studio (30 welcome credits included — preview
-                Chapter 1 free).
+                Import your own manuscript free ($19 Format Pass · 60 credits to
+                export EPUB 3 + 6×9 Print PDF + Cover Wrap), or build a new 18k+
+                word edition from scratch.
               </div>
             </div>
-            <Link
-              href={studioNewHref}
-              className={cn(
-                buttonVariants({ size: 'sm' }),
-                'shrink-0 gap-1.5 rounded-full'
-              )}
-            >
-              {t('btn_open_studio_prefill')}
-              <ArrowRight className="size-3.5" />
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={studioImportHref}
+                onClick={() =>
+                  saveDraftSnapshot(
+                    audit,
+                    sanitizedOutput ||
+                      manuscriptText ||
+                      audit?.extracted_excerpt ||
+                      ''
+                  )
+                }
+                className={cn(
+                  buttonVariants({ size: 'sm' }),
+                  'shrink-0 gap-1.5 rounded-full'
+                )}
+              >
+                {t('btn_format_my_manuscript')}
+                <ArrowRight className="size-3.5" />
+              </Link>
+              <Link
+                href={studioNewHref}
+                onClick={() => saveDraftSnapshot(audit)}
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'sm' }),
+                  'shrink-0 gap-1.5 rounded-full'
+                )}
+              >
+                {t('btn_open_studio_prefill')}
+              </Link>
+            </div>
           </div>
         </div>
       )}

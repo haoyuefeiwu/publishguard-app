@@ -93,6 +93,8 @@ export function SampleDeliverables() {
       id="sample-book"
       className="border-border bg-muted/20 border-t px-4 py-20 sm:py-24"
     >
+      {/* 兼容早期外联邮件中的 #sample 旧锚点跳转 */}
+      <span id="sample" className="sr-only" aria-hidden="true" />
       <div className="mx-auto max-w-6xl space-y-10">
         {/* 头部说明与实测指标徽章 */}
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">

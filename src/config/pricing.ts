@@ -26,11 +26,24 @@ export type PricingProduct = {
 
 /**
  * 获批商业漏斗定价矩阵：
- * - Single Book Pass（$29 一次性买断，120 积分）：恰好完成 1 本双轨专著 + 2 次局部洗稿重写
+ * - Format & Guard Pass（$19 一次性买断，60 积分）：自带书稿一键合规清洗 + 编译 EPUB 3 与印刷 5 件套
+ * - Single Book Pass（$29 一次性买断，120 积分）：恰好完成 1 本双轨 AI 专著 + 2 次局部洗稿重写
  * - Author Pro（$49/月 或 $390/年，每月 360 积分）：匹配 KDP 安全节奏（每月约 3 本）
  * - Publishing Studio（$99/月 或 $790/年，每月 1,000 积分）：多笔名矩阵隔离 + 最高优先级渲染
  */
 export const pricingCatalog: Record<string, PricingProduct> = {
+  manuscript_format_pass: {
+    productId: 'manuscript_format_pass',
+    productName: 'Format & Guard Pass',
+    planName: 'Format & Guard Pass',
+    description:
+      'One-time pass with 60 credits (format & compile 1 existing manuscript into KDP 5-file bundle)',
+    type: PaymentType.ONE_TIME,
+    priceInCents: 1900,
+    currency: 'usd',
+    credits: 60,
+    creditsValidDays: 365,
+  },
   single_book_pass: {
     productId: 'single_book_pass',
     productName: 'Single Book Pass',

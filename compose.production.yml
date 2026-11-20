@@ -59,6 +59,9 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       GROWTH_INTERNAL_TOKEN: ${GROWTH_INTERNAL_TOKEN:-}
       GROWTH_DRAFT_AUTHOR_EMAIL: ${GROWTH_DRAFT_AUTHOR_EMAIL:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_API_BASE: ${TELEGRAM_API_BASE:-https://api.telegram.org}
       KDP_ARTIFACTS_DIR: /app/data/kdp-artifacts
     volumes:
       - kdp_artifacts:/app/data/kdp-artifacts

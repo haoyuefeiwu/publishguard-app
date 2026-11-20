@@ -21,6 +21,7 @@ CoverTheme = Literal[
 TRIM_DIMENSIONS: dict[str, tuple[float, float]] = {
     "6x9": (6.0, 9.0),
     "5.5x8.5": (5.5, 8.5),
+    "8.5x11": (8.5, 11.0),
 }
 
 # 亚马逊 KDP 官方单页纸张厚度（英寸/页）

@@ -8,6 +8,7 @@ export const KDP_CREDIT_COSTS = {
   PREVIEW_CHAPTER_FIRST_FREE: 0, // 第一章免费试读（转化钩子）
   REGENERATE_CHAPTER: 10, // 单章重新生成或封面/内页重新编译（零 LLM 成本快速重打包）
   RECOMPILE_BUNDLE: 10, // 更改书名/封面/规格后重新编译交付包
+  COMPILE_IMPORTED_MANUSCRIPT: 60, // 导入自带书稿编译为全套 5 件套资产（$19 Format & Guard Pass）
   GENERATE_FULL_BOOK_BUNDLE: 100, // 18k-22k 词双轨全套资产（EPUB 3 + 印刷级 PDF + 全出血封面）
   AUTO_SANITIZE: 15, // AI 一键洗稿合规脱敏
 } as const;
