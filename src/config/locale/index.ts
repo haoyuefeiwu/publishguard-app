@@ -20,4 +20,5 @@ export const localeMessagesPaths = [
   'landing',
   'blog',
   'studio',
+  'tools',
 ];

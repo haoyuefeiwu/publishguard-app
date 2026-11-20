@@ -1,6 +1,7 @@
 {
   "nav": {
     "studio": "造书工作台",
+    "tools": "免费工具",
     "guard": "免费合规体检",
     "features": "核心壁垒",
     "pricing": "定价方案",
@@ -159,6 +160,9 @@
     "admin": "管理后台",
     "blog": "博客专栏",
     "docs": "免费体检仪",
-    "github": "造书工作台"
+    "github": "造书工作台",
+    "tools_hub": "全部免费工具",
+    "spine_calculator": "书脊与封面计算器",
+    "title_checker": "书名撞车检查器"
   }
 }

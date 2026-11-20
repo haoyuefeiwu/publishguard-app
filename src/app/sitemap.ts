@@ -9,7 +9,10 @@ export const dynamic = 'force-dynamic';
 
 const STATIC_PATHS = [
   '',
+  '/tools',
   '/tools/kdp-guard',
+  '/tools/kdp-spine-calculator',
+  '/tools/kdp-title-checker',
   '/pricing',
   '/blog',
   '/privacy-policy',
@@ -40,7 +43,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const pages = STATIC_PATHS.map((path) =>
     entry(path, {
       changeFrequency: path === '/blog' ? 'daily' : 'weekly',
-      priority: path === '' ? 1 : 0.8,
+      priority: path === '' ? 1 : path.startsWith('/tools') ? 0.85 : 0.8,
     })
   );
 

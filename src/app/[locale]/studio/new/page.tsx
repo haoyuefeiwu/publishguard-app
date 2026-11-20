@@ -65,6 +65,8 @@ export default function NewBookProjectPage() {
     const qCategory = (searchParams.get('category') || '').trim();
     const qDomain = (searchParams.get('domain') || '').trim();
     const qAudience = (searchParams.get('audience') || '').trim();
+    const qTrim = (searchParams.get('trim') || '').trim();
+    const qPaper = (searchParams.get('paper') || '').trim().toLowerCase();
 
     if (qMode === 'import') {
       setCreationMode('import');
@@ -72,6 +74,13 @@ export default function NewBookProjectPage() {
     } else if (qMode === 'generate') {
       setCreationMode('generate');
       setTargetPageCount(100);
+    }
+
+    if (qTrim === '5.5x8.5' || qTrim === '6x9' || qTrim === '8.5x11') {
+      setTrimSize(qTrim);
+    }
+    if (qPaper === 'white' || qPaper === 'cream') {
+      setPaperType(qPaper);
     }
 
     if (qTopic) setTopicPrompt(qTopic);

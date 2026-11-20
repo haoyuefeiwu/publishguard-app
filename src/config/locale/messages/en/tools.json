@@ -1,0 +1,192 @@
+{
+  "hub": {
+    "meta_title": "Free Amazon KDP Publishing Tools — Spine Calculator, Title Checker & 26-Rule Guard",
+    "meta_description": "Free pre-upload Amazon KDP tools: calculate exact paperback spine width & full cover wrap size, check title collisions against bestsellers, and run our 26-rule compliance scan.",
+    "badge": "Free Amazon KDP Pre-Flight Tool Suite · No Sign-Up Required",
+    "title": "Free Amazon KDP Formatting & Compliance Tools",
+    "subtitle": "Stop guessing KDP cover dimensions, gutter margins, or title keyword limits. Run instant pre-flight checks in your browser before KDP Previewer rejects your book.",
+    "card_open": "Open Free Tool",
+    "cards": {
+      "spine": {
+        "tag": "Print Layout · Instant",
+        "title": "KDP Paperback Spine & Cover Size Calculator",
+        "description": "Compute exact spine width (0.0025\" Cream / 0.002252\" White), full bleed cover dimensions in inches, mm, and 300 DPI pixels, KDP minimum gutter margins, plus downloadable PNG & SVG cover guides."
+      },
+      "title": {
+        "tag": "Metadata & Policy · Live Radar",
+        "title": "KDP Title Collision & Subtitle Policy Checker",
+        "description": "Scan your book title and subtitle against the 200-char limit, keyword stuffing patterns, banned promotional claims, and live Apple Books & OpenLibrary bestseller collisions."
+      },
+      "guard": {
+        "tag": "26-Rule Pre-Flight · EPUB & Print",
+        "title": "26-Rule Amazon KDP Compliance Guard",
+        "description": "Full manuscript, description, and .epub binary audit catching medical claims, coupon leaks, thin content triggers, workbook grid CSS, and clickable external URLs."
+      }
+    },
+    "bottom_cta": {
+      "badge": "Zero-Wait Done-For-You Option",
+      "title": "Have your own .docx, .epub, or Markdown manuscript ready?",
+      "description": "Skip wrestling with Word margins, Canva cover bleed math, and Kindle Previewer errors. Upload your finished draft and export all 5 KDP-ready print & Kindle deliverables for a flat $19 pass.",
+      "primary": "Format My Manuscript ($19 Pass)",
+      "secondary": "Compare All Plans"
+    }
+  },
+  "spine": {
+    "meta_title": "Free Amazon KDP Spine Width & Cover Size Calculator (2026 Specs)",
+    "meta_description": "Calculate exact Amazon KDP paperback spine width, 0.125\" bleed full wrap dimensions in inches/mm/300 DPI px, minimum gutter margins, and download a free cover template.",
+    "badge": "Updated for 2026 KDP Print Specs · 0.002252\" / 0.0025\" Paper",
+    "title": "Amazon KDP Paperback Spine & Cover Size Calculator",
+    "subtitle": "Calculate your exact paperback spine width, full cover wrap dimensions (in, mm & 300 DPI pixels), KDP minimum inside gutter margin, and download a free alignment guide.",
+    "form_trim": "Trim Size (Finished Interior Width × Height)",
+    "form_paper": "Paper Type & Ink Thickness",
+    "form_pages": "Total Interior Page Count",
+    "form_pages_hint": "Supported range: {min}–{max} pages. Spine text requires at least 79 pages.",
+    "form_pages_clamped": "KDP requires {min}–{max} pages for this paper type; clamped to {value} pp for print calculations.",
+    "form_bleed": "Interior Bleed Setting",
+    "bleed_none": "No Bleed (Standard Text)",
+    "bleed_full": "Bleed (Full-Page Art +0.125\")",
+    "card_cover_title": "Full Wrap Cover Size (With 0.125\" Bleed)",
+    "card_cover_note": "Set your Canva / Photoshop / Illustrator canvas to this exact size.",
+    "card_spine_title": "Exact Spine Width",
+    "card_spine_allowed": "Spine text allowed (>= 79 pages). Safe text zone width: {safeIn}\" ({safeMm} mm).",
+    "card_spine_forbidden": "Under 79 pages: KDP forbids spine text — keep the spine blank.",
+    "card_interior_title": "Interior Manuscript Page Size",
+    "card_interior_note_bleed": "Bleed adds +0.125\" outer width and +0.25\" total height to interior PDF.",
+    "card_interior_note_nobleed": "Exact trim size — ensure no images or backgrounds extend past margins.",
+    "card_margins_title": "KDP Minimum Margins",
+    "card_margins_gutter": "Inside / Gutter Min",
+    "card_margins_outside": "Outside / Top / Bottom Min",
+    "card_barcode_title": "Back Cover Barcode Clear Zone",
+    "card_barcode_desc": "Reserve a solid white 2.00\" × 1.20\" box at least 0.25\" from bottom edge and 0.25\" left of spine.",
+    "btn_copy_specs": "Copy All Specs",
+    "btn_download_png": "Download 300 DPI PNG Guide",
+    "btn_download_svg": "Download SVG Template",
+    "toast_copied": "Full KDP cover & interior dimensions copied to clipboard.",
+    "toast_png_ready": "300 DPI PNG cover guide downloaded.",
+    "toast_svg_ready": "SVG cover template downloaded.",
+    "preview_title": "Live Scaled Wraparound Cover Blueprint",
+    "preview_legend": "Red zone = 0.125\" bleed trimmed during printing · Dashed cyan = text safe zone · Bottom-right back box = 2.0\"×1.2\" barcode area",
+    "cta_title": "Skip manual margin & Canva cover sizing — let PublishGuard compile all 5 files ($19)",
+    "cta_desc": "Upload your .docx, .epub, .md, or .txt manuscript with {trim} {paper} specs pre-selected. We pass our 26-rule guard, typeset your print interior PDF, build an exact {coverW}\" × {coverH}\" wraparound cover with white barcode safe zone, and compile Kindle EPUB 3.",
+    "cta_nonstandard_note": "Note: Studio Print Builder compiles 5.5\"×8.5\", 6\"×9\", and 8.5\"×11\" trim sizes natively; selecting Continue will pre-fill the closest Studio preset ({studioTrim} · {studioPaper}).",
+    "cta_primary": "Format & Export My Book ($19 Pass)",
+    "cta_secondary": "Run Free 26-Rule Manuscript Check",
+    "reference_title": "Official Amazon KDP Paper Thickness & Gutter Margin Reference (2026)",
+    "reference_desc": "Use these Amazon KDP formulas whenever KDP Print Previewer rejects your PDF for bleed, gutter, or spine misalignment.",
+    "ref_col_paper": "KDP Paper Type",
+    "ref_col_thickness": "Page Thickness (in / mm)",
+    "ref_col_range": "Page Limit",
+    "ref_col_formula": "Spine Width Formula",
+    "gutter_table_title": "KDP Minimum Inside (Gutter) Margins by Page Count",
+    "gutter_col_pages": "Page Count Range",
+    "gutter_col_gutter": "Minimum Inside Margin",
+    "gutter_col_outside": "Min Outside Margin (No Bleed / Bleed)",
+    "faq_title": "Frequently Asked Questions About KDP Cover & Spine Sizing",
+    "faqs": [
+      {
+        "q": "How does Amazon KDP calculate paperback spine width?",
+        "a": "Amazon KDP multiplies your exact interior PDF page count by the paper thickness factor: 0.0025 inches per page for Black & White Cream paper, 0.002252 inches for Black & White White paper or Standard Color, and 0.002347 inches for Premium Color."
+      },
+      {
+        "q": "Why did KDP Previewer reject my cover even though I used 6×9 trim size?",
+        "a": "KDP requires a single wraparound PDF covering the 0.125\" outer bleed, back cover, calculated spine width, front cover, and right 0.125\" bleed. Even being off by 2 pages or forgetting the 0.25\" total vertical bleed causes automatic rejection."
+      },
+      {
+        "q": "What is the minimum page count to put text on a KDP book spine?",
+        "a": "Amazon KDP requires at least 79 pages before allowing spine text, and mandates at least 0.0625\" (1.6 mm) of clear margin on both sides of the spine fold."
+      },
+      {
+        "q": "What size is the ISBN barcode box on a KDP back cover?",
+        "a": "KDP places a 2.00\" wide by 1.20\" tall barcode on the lower-right of the back cover, inset at least 0.25\" from the bottom trim edge and 0.25\" from the spine crease. PublishGuard leaves this box pure white automatically."
+      },
+      {
+        "q": "Can I convert my Word or EPUB draft directly to these exact KDP dimensions?",
+        "a": "Yes. Click Format & Export My Book ($19 Pass) above to upload your .docx, .epub, .md, or .txt manuscript. PublishGuard typesets both the interior PDF and full bleed wraparound cover automatically."
+      }
+    ]
+  },
+  "titleChecker": {
+    "meta_title": "Free Amazon KDP Title Checker & Collision Scanner — Avoid Option 1 Bans",
+    "meta_description": "Check your Amazon KDP book title and subtitle for keyword stuffing, banned promotional claims, 200-char limits, and live Apple Books & OpenLibrary title collisions.",
+    "badge": "Live Title Collision + KDP Metadata Policy Radar",
+    "title": "Amazon KDP Title & Subtitle Compliance Checker",
+    "subtitle": "Avoid Option 1 impersonation flags and keyword-stuffing rejections. Check character length, banned sales claims, and live published catalog collisions in one scan.",
+    "btn_load_risky": "Load Risky Title Example",
+    "label_title": "Book Title",
+    "placeholder_title": "e.g. Deep Focus Architecture",
+    "label_subtitle": "Book Subtitle (Optional)",
+    "placeholder_subtitle": "e.g. Practical Systems for Sustained Attention in Modern Knowledge Work",
+    "label_author": "Author / Pen Name",
+    "placeholder_author": "e.g. Evelyn Vance",
+    "label_category": "Primary KDP Category",
+    "meter_total": "Combined Title + Subtitle Length: {count} / 200 KDP Max",
+    "meter_sub": "Subtitle Length: {count} chars (recommended <= 100 to prevent keyword-stuffing flags)",
+    "btn_check": "Scan Title & Check Live Collisions",
+    "btn_checking": "Checking Catalogs & Policy Rules...",
+    "score_label": "Metadata Safety Score",
+    "status_safe": "CLEAN METADATA",
+    "status_warn": "POLICY / COLLISION RISKS FOUND",
+    "collisions_title": "Published Catalog Matches (Apple Books & OpenLibrary)",
+    "no_collisions": "No exact title collisions returned from checked catalogs.",
+    "exact_matches_label": "Exact Title Matches",
+    "similar_matches_label": "Similar Titles",
+    "findings_title": "Title, Subtitle & Imprint Policy Findings",
+    "no_findings": "No title keyword-stuffing, medical-claim, or banned-tag patterns triggered.",
+    "cta_title": "Title cleared? Compile your manuscript or run the full 26-rule EPUB & text scan",
+    "cta_desc": "Your checked title, subtitle, pen name, and category carry over automatically when you open PublishGuard Studio or run the full 26-rule scanner.",
+    "cta_import": "Format My Manuscript With This Title ($19)",
+    "cta_full_guard": "Continue With Full 26-Rule Manuscript Audit",
+    "guide_title": "Amazon KDP Title & Subtitle Rules That Trigger Rejections",
+    "rules": [
+      {
+        "title": "Strict 200-Character Combined Ceiling",
+        "detail": "KDP enforces a hard 200-character limit across Title + Subtitle combined. Excess punctuation, colons, or keyword lists past ~100 subtitle characters trigger metadata rejections."
+      },
+      {
+        "title": "Zero Sales Claims, Rankings, or Promo Language",
+        "detail": "Words like \"#1 Bestseller\", \"Free Gift\", \"Bonus PDF\", \"Guaranteed Cure\", or discount tags inside your title or subtitle violate KDP Metadata Guidelines."
+      },
+      {
+        "title": "Option 1 Impersonation & Bestseller Collisions",
+        "detail": "Matching the exact title of an established commercial book in the same niche invites Customer Confusion / Option 1 blocking notices unless clearly differentiated."
+      },
+      {
+        "title": "Author Name Must Be Human / Pen Name Safe",
+        "detail": "Avoid stuffing keywords into the Author field or inventing fake major publishing city lines in metadata fields."
+      }
+    ],
+    "faq_title": "KDP Title & Subtitle Checker FAQ",
+    "faqs": [
+      {
+        "q": "What is Amazon KDP's Title + Subtitle character limit?",
+        "a": "Amazon KDP allows up to 200 characters combined for Title + Subtitle, though subtitles longer than 100–110 characters often trigger manual keyword-stuffing reviews."
+      },
+      {
+        "q": "What is an Option 1 title collision on KDP?",
+        "a": "When a new upload shares an exact or near-identical title with an established bestselling book in the same topic, Amazon may block or terminate the title for misleading customer expectations."
+      },
+      {
+        "q": "Which catalogs does this live title checker query?",
+        "a": "Each scan checks both the Apple Books catalog and OpenLibrary in real time, then scores the combined metadata against PublishGuard's KDP policy rules."
+      },
+      {
+        "q": "Why should subtitles avoid dashes filled with search keywords?",
+        "a": "Separating 5+ search phrases with colons, pipes (|), or commas in a subtitle is one of the top reasons KDP sends \"blocked due to misleading metadata\" emails."
+      },
+      {
+        "q": "Can I format my full manuscript right after verifying my title?",
+        "a": "Yes. Click Format My Manuscript With This Title ($19) and your verified title, subtitle, pen name, and category will pre-fill inside PublishGuard Studio."
+      }
+    ]
+  },
+  "crossLinks": {
+    "heading": "More Free KDP Pre-Flight Tools",
+    "view_all": "View All Tools",
+    "spine_title": "Spine & Cover Size Calculator",
+    "spine_desc": "Calculate exact cream/white spine width, 0.125\" bleed wrap sizes & download 300 DPI PNG guides.",
+    "title_title": "Title Collision & Policy Checker",
+    "title_desc": "Check 200-char limits, subtitle keyword stuffing & live catalog bestseller collisions.",
+    "guard_title": "Full 26-Rule Pre-Flight Guard",
+    "guard_desc": "Audit book descriptions, manuscript chapters & .epub files before KDP review."
+  }
+}

@@ -1,6 +1,7 @@
 {
   "nav": {
     "studio": "Book Studio",
+    "tools": "Free Tools",
     "guard": "Free KDP Guard",
     "features": "Firewall & Specs",
     "pricing": "Pricing",
@@ -159,6 +160,9 @@
     "admin": "Admin Panel",
     "blog": "Blog",
     "docs": "Free KDP Guard",
-    "github": "Book Studio"
+    "github": "Book Studio",
+    "tools_hub": "All Free KDP Tools",
+    "spine_calculator": "Spine & Cover Calculator",
+    "title_checker": "Title Collision Checker"
   }
 }

@@ -14,9 +14,20 @@ export async function Footer() {
       ],
     },
     {
+      title: t('footer.product'),
+      links: [
+        { label: t('footer.tools_hub'), href: '/tools' },
+        {
+          label: t('footer.spine_calculator'),
+          href: '/tools/kdp-spine-calculator',
+        },
+        { label: t('footer.title_checker'), href: '/tools/kdp-title-checker' },
+        { label: t('footer.docs'), href: '/tools/kdp-guard' },
+      ],
+    },
+    {
       title: t('footer.resources'),
       links: [
-        { label: t('footer.docs'), href: '/tools/kdp-guard' },
         { label: t('footer.github'), href: '/studio' },
         { label: t('footer.blog'), href: '/blog' },
       ],

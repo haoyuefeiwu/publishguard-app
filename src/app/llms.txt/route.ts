@@ -13,6 +13,24 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
       'PublishGuard — Ban-Proof Amazon KDP Pre-Flight Compliance & AI Book Studio',
   },
   {
+    path: '/tools',
+    title: 'Free Amazon KDP Publishing Tools',
+    description:
+      'Hub of free pre-upload KDP tools: paperback spine & cover size calculator, title collision checker, and 26-rule compliance guard',
+  },
+  {
+    path: '/tools/kdp-spine-calculator',
+    title: 'Free KDP Paperback Spine & Cover Size Calculator',
+    description:
+      'Calculate exact KDP paperback spine width (0.0025" Cream / 0.002252" White), 0.125" bleed cover dimensions in in/mm/300 DPI px, minimum gutter margins, and downloadable cover guides',
+  },
+  {
+    path: '/tools/kdp-title-checker',
+    title: 'Free KDP Title Collision & Subtitle Policy Checker',
+    description:
+      'Scan Amazon KDP titles and subtitles against the 200-char limit, keyword stuffing rules, and live Apple Books & OpenLibrary bestseller collisions',
+  },
+  {
     path: '/tools/kdp-guard',
     title: 'Free KDP Pre-Flight Scanner',
     description:
@@ -20,15 +38,15 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
   },
   {
     path: '/studio',
-    title: 'AI Book Studio',
+    title: 'AI Book Studio & Manuscript Formatter',
     description:
-      'End-to-end 18,000+ word monograph drafting, EPUB 3.0 & Print PDF compilation verified with Kindle Previewer 4.0.3',
+      'Import your own .docx/.epub/.md manuscript ($19 Format & Guard Pass) or build an 18,000+ word monograph ($29) verified with Kindle Previewer 4.0.3',
   },
   {
     path: '/pricing',
     title: 'Pricing',
     description:
-      'Single Book Pass ($29 / 120 credits), Author Pro ($49/mo or $390/yr), and Publishing Studio ($99/mo or $790/yr)',
+      'Format & Guard Pass ($19 / 60 credits), Single Book Pass ($29 / 120 credits), Author Pro ($49/mo or $390/yr), and Publishing Studio ($99/mo or $790/yr)',
   },
   {
     path: '/blog',

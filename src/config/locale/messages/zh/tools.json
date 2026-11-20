@@ -1,0 +1,192 @@
+{
+  "hub": {
+    "meta_title": "免费 Amazon KDP 出版工具矩阵 — 书脊计算器、书名撞车检查与 26 项预检雷达",
+    "meta_description": "免费在线 Amazon KDP 出书工具：精准计算平装书脊宽度与全出血封面尺寸、检测书名与畅销榜撞车及副标题合规风险，并免费运行 26 项上架前合规预检。",
+    "badge": "免费 Amazon KDP 预检工具矩阵 · 无需注册即开即用",
+    "title": "免费 Amazon KDP 排版计算与合规体检工具",
+    "subtitle": "上传 KDP 前别再盲猜封面出血、装订边距或书名红线——在浏览器里 10 秒查清所有印刷参数与封号风险。",
+    "card_open": "立即免费使用",
+    "cards": {
+      "spine": {
+        "tag": "印刷尺寸 · 实时生成底图",
+        "title": "KDP 平装书脊与环绕封面尺寸计算器",
+        "description": "按官方系数精确计算米黄纸（0.0025\"）/ 白纸（0.002252\"）书脊宽度、含 0.125\" 出血的全封面尺寸（英寸/毫米/300 DPI 像素）与分档装订边，并一键下载 300 DPI PNG / SVG 蓝图。"
+      },
+      "title": {
+        "tag": "元数据风控 · 实时雷达",
+        "title": "KDP 书名撞车与副标题合规检查器",
+        "description": "实时检查主副标题 200 字符上限、关键词堆砌、促销禁词，并联网检索 Apple Books 与 OpenLibrary 排查 Option 1 书名撞车风险。"
+      },
+      "guard": {
+        "tag": "26 项全套 pre-flight 预检",
+        "title": "Amazon KDP 26 项合规扫雷卫士",
+        "description": "一站扫描书籍简介、正文草稿或 .epub 二进制包，精准拦截医疗/疗效承诺、折扣码、单薄内容、打卡框 CSS 与外部超链接死锁。"
+      }
+    },
+    "bottom_cta": {
+      "badge": "自带书稿免折腾方案",
+      "title": "手里已经有写好的 .docx、.epub 或 Markdown 书稿？",
+      "description": "无需自己在 Word 调装订边距、也不用去 Canva 手算书脊像素。直接上传你的定稿，$19 一次性导出 KDP 实测可用的 5 件套文件（含 300 DPI 展开封面、印刷 PDF、Kindle EPUB 3 与填表清单）。",
+      "primary": "立即导入书稿排版导出（$19 通行证）",
+      "secondary": "查看全部定价方案"
+    }
+  },
+  "spine": {
+    "meta_title": "免费 Amazon KDP 书脊宽度与环绕封面尺寸计算器（2026 官方公式）",
+    "meta_description": "免费精确计算 Amazon KDP 平装书脊宽度、含 0.125\" 出血的全封面展开尺寸（英寸/毫米/300 DPI 像素）及最小装订边距，支持免费下载 300 DPI 封面定位底图。",
+    "badge": "同步 2026 KDP 官方印刷参数 · 支持 0.0025\" 米黄纸 / 0.002252\" 白纸",
+    "title": "Amazon KDP 平装书脊与环绕封面尺寸计算器",
+    "subtitle": "实时计算精确书脊宽度、Canva/PS 用的全覆盖环绕封面像素尺寸、官方分档装订边距（Gutter），并支持免费下载 300 DPI 参考定位底图。",
+    "form_trim": "裁切开本（成品内页宽 × 高）",
+    "form_paper": "内页纸型与单页厚度系数",
+    "form_pages": "内页总页数（Pages）",
+    "form_pages_hint": "该纸型合法范围：{min}–{max} 页；总页数需 ≥ 79 页才允许印书脊文字。",
+    "form_pages_clamped": "KDP 规定该纸型页数须在 {min}–{max} 页之间，已按 {value} 页参与计算。",
+    "form_bleed": "内页出血模式（Interior Bleed）",
+    "bleed_none": "无出血（纯文字/标准书稿）",
+    "bleed_full": "含出血（满页插画/底色 +0.125\"）",
+    "card_cover_title": "环绕封面全展开尺寸（含 0.125\" 四周出血）",
+    "card_cover_note": "在 Canva / Photoshop / Illustrator 新建封面画布时直接填这组像素或英寸尺寸。",
+    "card_spine_title": "精确书脊宽度（Spine Width）",
+    "card_spine_allowed": "允许印刷书脊文字（>= 79 页），扣除安全留白后书脊可用字宽：{safeIn}\"（{safeMm} mm）。",
+    "card_spine_forbidden": "不足 79 页：KDP 严禁在书脊放置任何文字，请保持书脊留白。",
+    "card_interior_title": "内页 PDF 上传尺寸",
+    "card_interior_note_bleed": "含出血模式：内页宽度仅单侧外边 +0.125\"，高度上下共 +0.25\"。",
+    "card_interior_note_nobleed": "无出血标准裁切尺寸：请确保正文与图片不要越过安全边距。",
+    "card_margins_title": "KDP 官方最小边距（Margins）",
+    "card_margins_gutter": "装订侧内边距（Gutter）最低要求",
+    "card_margins_outside": "外边 / 天头 / 地脚最低要求",
+    "card_barcode_title": "封底 ISBN 条码留白安全区",
+    "card_barcode_desc": "封底右下角须留出纯白 2.00\" × 1.20\" 矩形区域（距下裁切边 >= 0.25\"，距书脊线 >= 0.25\"）。",
+    "btn_copy_specs": "一键复制全部尺寸",
+    "btn_download_png": "下载 300 DPI PNG 定位图",
+    "btn_download_svg": "下载 SVG 矢量模板",
+    "toast_copied": "已复制全部 KDP 封面与内页尺寸参数到剪贴板。",
+    "toast_png_ready": "300 DPI PNG 封面参考定位图已开始下载。",
+    "toast_svg_ready": "SVG 环绕封面矢量模板已开始下载。",
+    "preview_title": "等比例环绕封面蓝图预览（含出血与条码区）",
+    "preview_legend": "外圈浅红 = 0.125\" 裁切出血区 · 蓝色虚线框 = 文字安全区 · 封底右下白框 = 2.0\"×1.2\" ISBN 条码保留区",
+    "cta_title": "不想手动调 Word 装订边和 Canva 像素？上传书稿 $19 一键导出全部 5 个文件",
+    "cta_desc": "点击下方按钮将自动预选 {trim}（{paper}）规格，直接上传你的 .docx / .epub / .md 书稿：自动完成 26 项预检、生成符合 Gutter 边距的内页 PDF、精确 {coverW}\" × {coverH}\" 纯白条码区环绕封面与 Kindle EPUB 3。",
+    "cta_nonstandard_note": "提示：工作台自动排版原生支持 5.5\"×8.5\"、6\"×9\"、8.5\"×11\" 三大主流开本，点击进入将自动匹配最接近的工作台预设（{studioTrim} · {studioPaper}）。",
+    "cta_primary": "一键带参数导入书稿导出（$19 通行证）",
+    "cta_secondary": "免费运行 26 项书稿合规体检",
+    "reference_title": "Amazon KDP 官方纸张厚度与装订边距速查表（2026）",
+    "reference_desc": "当 KDP Print Previewer 报出血不足、书脊偏移或装订边距过窄时，可直接对照下表逐项核验。",
+    "ref_col_paper": "KDP 纸张类型",
+    "ref_col_thickness": "单页厚度（英寸 / 毫米）",
+    "ref_col_range": "页数限制",
+    "ref_col_formula": "书脊宽计算公式",
+    "gutter_table_title": "按总页数分档的 KDP 最小装订边距（Inside / Gutter Margin）",
+    "gutter_col_pages": "内页总页数区间",
+    "gutter_col_gutter": "最小装订内边距（Gutter）",
+    "gutter_col_outside": "最小外边距（无出血 / 含出血）",
+    "faq_title": "KDP 书脊宽度与封面出血常见问题（FAQ）",
+    "faqs": [
+      {
+        "q": "Amazon KDP 平装本的书脊宽度究竟是怎么算出来的？",
+        "a": "KDP 官方公式为「总页数 × 单页厚度系数」：黑白米黄纸（Cream）为 0.0025 英寸/页，黑白纯白纸（White）与标准彩印为 0.002252 英寸/页，高级彩印（Premium Color）为 0.002347 英寸/页。"
+      },
+      {
+        "q": "为什么我按 6×9 做了封面图，上传 KDP 预览器还是报错被拒？",
+        "a": "KDP 封面不是单张正面图，而是包含「左 0.125\" 出血 + 封底 + 书脊 + 封面 + 右 0.125\" 出血」的整张环绕 PDF，高度还需上下各加 0.125\" 出血（共 +0.25\"）。只要页数差 2 页或漏算出血都会被直接拦截。"
+      },
+      {
+        "q": "书至少多少页才可以在书脊上写书名？",
+        "a": "KDP 明确规定总页数至少达到 79 页才允许印制书脊文字，且文字两侧各自需保留至少 0.0625 英寸的安全留白，否则预览器会直接退回。"
+      },
+      {
+        "q": "封底条码区应该预留多大？",
+        "a": "需在封底右下角预留宽 2.00 英寸 × 高 1.20 英寸的留白区，距离底部裁切边及右侧书脊线均不得小于 0.25 英寸。PublishGuard 会自动生成纯白底条码安全区。"
+      },
+      {
+        "q": "可以把我的 Word / EPUB 书稿直接套用这个尺寸导出吗？",
+        "a": "可以。点击页面中的「一键带参数导入书稿导出（$19 通行证）」，上传 .docx / .epub / .md / .txt，系统会自动套用安全装订边距并生成精确匹配页数的封面包。"
+      }
+    ]
+  },
+  "titleChecker": {
+    "meta_title": "免费 Amazon KDP 书名撞车与副标题合规检查器 — 避开 Option 1 封号红线",
+    "meta_description": "免费扫描 Amazon KDP 书名与副标题：检测 200 字符上限、副标题关键词堆砌、促销/医疗禁词，并实时检索 Apple Books 与 OpenLibrary 撞车风险。",
+    "badge": "KDP 书名防撞车 + 元数据红线实时扫描仪",
+    "title": "Amazon KDP 书名与副标题合规检查器",
+    "subtitle": "提前拦截导致 KDP 审核拒绝或 Option 1 账号封禁的元数据陷阱：一次检查字符上限、关键词堆砌与实时目录撞车风险。",
+    "btn_load_risky": "加载高危书名样例测试",
+    "label_title": "主书名（Book Title）",
+    "placeholder_title": "例如：Deep Focus Architecture",
+    "label_subtitle": "副标题（Subtitle，选填）",
+    "placeholder_subtitle": "例如：Practical Systems for Sustained Attention in Modern Knowledge Work",
+    "label_author": "作者 / 笔名（Pen Name）",
+    "placeholder_author": "例如：Evelyn Vance",
+    "label_category": "KDP 主分类（Primary Category）",
+    "meter_total": "主副标题合计字符：{count} / 200（KDP 硬上限）",
+    "meter_sub": "副标题长度：{count} 字符（建议控制在 100 字符内，避免被判定关键词堆砌）",
+    "btn_check": "立即检测书名合规与撞车风险",
+    "btn_checking": "正在检索图书目录并校验规则...",
+    "score_label": "元数据安全评分",
+    "status_safe": "书名元数据洁净",
+    "status_warn": "发现合规或撞车风险",
+    "collisions_title": "已出版图书目录匹配结果（Apple Books & OpenLibrary）",
+    "no_collisions": "已查目录中未发现完全同名的碰撞书名。",
+    "exact_matches_label": "完全同名书籍（高危撞车）",
+    "similar_matches_label": "高度相似书名",
+    "findings_title": "书名、副标题与印记红线排查详情",
+    "no_findings": "未检出关键词堆砌、医疗疗效声明或促销禁词违规。",
+    "cta_title": "书名测稳了？直接用这组标题导入你的书稿打包，或继续扫描全本正文",
+    "cta_desc": "你刚才填写的书名、副标题、笔名与分类会自动保留——无需重新输入即可进入导入编译（$19）或全套 26 项深扫。",
+    "cta_import": "用这个书名导入书稿打包（$19 通行证）",
+    "cta_full_guard": "继续上传正文 / .epub 做 26 项深度体检",
+    "guide_title": "最容易导致 KDP 退回或封号的 4 条书名与副标题红线",
+    "rules": [
+      {
+        "title": "主副标题总长严禁超过 200 字符",
+        "detail": "KDP 硬性限制主标题 + 副标题合计不超过 200 字符；副标题超过 100 字符且使用竖线/冒号堆砌长尾词极易被直接拒审。"
+      },
+      {
+        "title": "严禁出现销量排名、限时折扣与诱导词",
+        "detail": "书名与副标题内出现 #1 Bestseller、Free Bonus、Coupon、Guaranteed Cure 等促销或夸大承诺词会直接触发元数据结构违规。"
+      },
+      {
+        "title": "Option 1 撞车与误导客户风险",
+        "detail": "主书名若与已畅销商业图书完全重名且缺乏差异化定位，极易触发亚马逊 Option 1 冒用/误导消费者申诉。"
+      },
+      {
+        "title": "作者栏须为真实自然人/笔名风格",
+        "detail": "不要在作者字段塞入搜索关键词，也不要在副标题中伪造知名传统出版社城市印记。"
+      }
+    ],
+    "faq_title": "KDP 书名与副标题排查常见问题（FAQ）",
+    "faqs": [
+      {
+        "q": "KDP 规定书名加副标题最多多少个字符？",
+        "a": "KDP 系统硬性上限为总计 200 个字符；但实战中建议副标题控制在 100–110 个字符以内且保持自然语句，以免被风控机器误判为堆砌关键词。"
+      },
+      {
+        "q": "什么是让很多新号被封的 Option 1 书名撞车？",
+        "a": "Option 1 是 KDP 常见的下架与封号判定之一，多因新书主标题或副标题与市面上畅销作品重名或高度近似、易令买家混淆。"
+      },
+      {
+        "q": "这个书名工具会实时查哪些出版库？",
+        "a": "每次检测都会同步检索 Apple Books 目录与 OpenLibrary 开放图书馆的真实出版记录，同时执行 PublishGuard 的元数据规则扫雷。"
+      },
+      {
+        "q": "为什么副标题里用好多破折号或竖线串关键词很危险？",
+        "a": "在副标题用多个冒号、竖线或逗号罗列搜索词是 KDP 发送「Misleading Metadata」拒审邮件的首要原因。"
+      },
+      {
+        "q": "测完书名可以直接打包成 KDP 文件吗？",
+        "a": "可以。点击下方按钮即可把当前已通过验证的书名、副标题和笔名直接带入书稿导入页，只需 $19 即可导出全套印刷 PDF 与 Kindle EPUB 3。"
+      }
+    ]
+  },
+  "crossLinks": {
+    "heading": "更多免费 KDP 上架前实用工具",
+    "view_all": "查看全部工具",
+    "spine_title": "平装书脊与环绕封面尺寸计算器",
+    "spine_desc": "一键算准米黄/白纸书脊、含出血展开尺寸并下载 300 DPI PNG 定位图。",
+    "title_title": "书名撞车与副标题合规检查器",
+    "title_desc": "排查 200 字符上限、副标题关键词堆砌与实时目录撞车风险。",
+    "guard_title": "26 项全套书稿合规扫雷卫士",
+    "guard_desc": "支持直接上传 .epub 或粘贴正文，上线前一站排查全部风险。"
+  }
+}
