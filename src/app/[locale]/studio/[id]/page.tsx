@@ -778,7 +778,7 @@ export default function StudioProjectDetailPage() {
             [
               'KDP AI-Generated Content Disclosure (Required)',
               isImportedManuscript
-                ? 'None — Human-authored manuscript (select AI-assisted only if you ran optional AI Compliance Sanitizer) · Typographic cover · Confirm in Kindle Previewer'
+                ? 'Review required — confirm how the imported manuscript was created. Disclose any AI-generated text, images, or translations, including content you later edited. AI assistance alone does not require disclosure.'
                 : 'Text: AI-generated (entire or edited) · Verify cover asset origin · Confirm in Kindle Previewer 3 & Print Previewer',
             ],
           ].map(([label, val]) => (

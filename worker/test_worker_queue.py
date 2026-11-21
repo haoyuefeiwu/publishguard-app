@@ -734,7 +734,9 @@ def test_sqlite_worker_compile_manuscript_uses_zero_llm_and_refunds_on_guard_blo
     assert (artifacts_dir / proj_ok["bundle_zip_key"]).exists()
 
     checklist_json = json.loads((artifacts_dir / proj_id / "04_KDP_Metadata_Checklist.json").read_text(encoding="utf-8"))
-    assert "None — Human-authored imported manuscript" in checklist_json["ai_generated_disclosure"]["text_content"]
+    disclosure = checklist_json["ai_generated_disclosure"]
+    assert disclosure["text_content"] == "Review required — confirm how the imported manuscript was created."
+    assert "including content you later edited" in disclosure["guidance"]
 
     assert job_bad["status"] == "failed"
     assert "KDP Guard failed" in (job_bad["error"] or "")

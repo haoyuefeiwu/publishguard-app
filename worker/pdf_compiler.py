@@ -509,16 +509,19 @@ def compile_paperback_and_bundle(
     wrap_html_path.write_text(wrap_html_str, encoding="utf-8")
     render_html_to_pdf(wrap_html_path, wrap_pdf_path)
 
-    # 3. 保存元数据核对单（区分人类原创导入书稿与 AI 全书生成对应的 KDP 申报文案）
+    # 3. 保存元数据核对单（导入外部书稿时，由作者确认稿件来源）
     checklist_path = work_dir / "04_KDP_Metadata_Checklist.json"
     checklist_data = metadata_checklist or {}
     is_imported = source_mode == "imported_manuscript"
     disclosure = (
         {
             "required_by_kdp": True,
-            "text_content": "None — Human-authored imported manuscript (select AI-assisted only if you ran optional AI Compliance Sanitizer)",
+            "text_content": "Review required — confirm how the imported manuscript was created.",
             "images_or_cover": "Template typographic cover (no AI-generated artwork)",
-            "guidance": "If your manuscript was written by you without AI generation, select 'No' for AI-generated content unless you used AI editing tools above KDP's AI-assisted threshold.",
+            "guidance": (
+                "Disclose any AI-generated text, images, or translations, including content you later edited. "
+                "AI assistance alone does not require disclosure."
+            ),
         }
         if is_imported
         else {

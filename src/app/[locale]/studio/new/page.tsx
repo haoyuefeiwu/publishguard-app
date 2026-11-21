@@ -336,8 +336,8 @@ export default function NewBookProjectPage() {
                     Upload .docx, .epub, .md, or .txt (Max 15MB)
                   </div>
                   <div className="text-muted-foreground">
-                    We preserve your human-authored prose verbatim and only
-                    strip unsafe HTML/external links.
+                    We preserve your manuscript text verbatim and only strip
+                    unsafe HTML/external links.
                   </div>
                   {manuscriptFile && (
                     <div className="text-primary pt-1 font-mono font-medium">
